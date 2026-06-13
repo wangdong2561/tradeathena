@@ -10,7 +10,7 @@ interface Props {
 }
 
 const VOLUMES = [0.01, 0.05, 0.1, 0.5, 1.0]
-const SL_PCTS = [10, 20, 30, 50]       // -10%, -20%, -30%, -50%
+const SL_PCTS = [5, 10, 20, 30]       // -5%, -10%, -20%, -30%
 const TP_MULTS = [1, 2, 3, 5]          // 1x, 2x, 3x, 5x
 
 export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderResult }) => {

@@ -1,4 +1,4 @@
-"""Symbol information — trading hours, specs, descriptions (Beijing time)."""
+"""Symbol information — trading hours, specs, descriptions (Eastern European Time)."""
 
 SYMBOL_INFO = {
     "BTCUSDT": {

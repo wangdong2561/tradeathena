@@ -182,7 +182,9 @@ tradeathena/
 
 ---
 
-## Trading Hours (Beijing Time)
+## Trading Hours (EET)
+
+> System time is Eastern European Time (EET). DST (Mar-Oct): UTC+3, Winter: UTC+2.
 
 | Symbol | Exchange | Trading Hours | Break |
 |:---|:---|:---|:---|

@@ -5,15 +5,17 @@ interface Props {
   ticks: Record<string, Ticker>
   selectedSymbol: string
   onSelect: (s: string) => void
+  clock?: string
 }
 
-export const MarketWatch: React.FC<Props> = ({ ticks, selectedSymbol, onSelect }) => {
+export const MarketWatch: React.FC<Props> = ({ ticks, selectedSymbol, onSelect, clock }) => {
   const symbols = Object.keys(ticks)
 
   return (
     <div className="market-watch">
-      <div className="header">
+      <div className="header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span>行情报价</span>
+        {clock && <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{clock}</span>}
       </div>
       <div className="symbol-list">
         {symbols.map(sym => {

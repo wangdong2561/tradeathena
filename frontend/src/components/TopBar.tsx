@@ -120,7 +120,7 @@ export const TopBar: React.FC<Props> = ({
           </div>
 
           <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)' }}>
-            时间均为北京时间 (UTC+8)
+            时间均为东欧时间 (EET, UTC+2/UTC+3)
           </div>
         </div>
       )}

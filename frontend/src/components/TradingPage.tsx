@@ -20,6 +20,16 @@ import '../styles.css'
 type Tab = 'trade' | 'positions' | 'orders' | 'history'
 
 export const TradingPage: React.FC = () => {
+  // Clock
+  const [clock, setClock] = useState('')
+  useEffect(() => {
+    const tick = () => {
+      setClock(new Date().toLocaleString('zh-CN', { timeZone: 'Europe/Bucharest', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+    }
+    tick()
+    const iv = setInterval(tick, 1000)
+    return () => clearInterval(iv)
+  }, [])
   // Market state
   const [symbols, setSymbols] = useState<string[]>(['BTCUSDT', 'XAUUSD', 'XAGUSD'])
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT')
@@ -188,6 +198,10 @@ export const TradingPage: React.FC = () => {
   const handleOrderResult = useCallback((result: TradeResult) => {
     setOrderMessage(result.message ? `${result.filled ? '✅ ' : '❌ '}${result.message}` : JSON.stringify(result))
     setTimeout(() => setOrderMessage(null), 4000)
+    // Refresh account and positions
+    getAccount().then(setAccount).catch(() => {})
+    getPositions().then(r => setPositions(r.positions)).catch(() => {})
+    getPendingOrders().then(r => setPendingOrders(r.orders)).catch(() => {})
     // Add entry marker on filled order
     if (result.filled && klineData.length > 0 && result.side) {
       const lastTime = klineData[klineData.length - 1].time as number
@@ -230,7 +244,7 @@ export const TradingPage: React.FC = () => {
         <Panel defaultSize={75} minSize={40}>
           <PanelGroup direction="horizontal" autoSaveId="main-h2" style={{ height: '100%' }}>
             <Panel defaultSize={15} minSize={10} maxSize={25}>
-              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} />
+              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} clock={clock} />
             </Panel>
             <PanelResizeHandle className="resize-handle resize-handle-h" />
             <Panel minSize={40}>
