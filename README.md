@@ -166,6 +166,7 @@ tradeathena/
 | Market/Limit/Stop Orders | ✅ | Three order types |
 | SL/TP Quick Setup | ✅ | -10%~-50% + 1x~5x presets |
 | EMA 20/50 Indicators | ✅ | Toggle display |
+| Golden/Death Cross Detection | ✅ | Auto ◆ markers + counters |
 | RSI Indicator | ✅ | 14-period, overbought/oversold |
 | Horizontal Line Drawing | ✅ | Click to place, clearable |
 | Entry/Exit Markers | ✅ | Auto-arrows on chart |

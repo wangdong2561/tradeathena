@@ -24,7 +24,7 @@ export const TradingPage: React.FC = () => {
   const [symbols, setSymbols] = useState<string[]>(['BTCUSDT', 'XAUUSD', 'XAGUSD'])
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT')
   const [ticks, setTicks] = useState<Record<string, Ticker>>({})
-  const [klineData, setKlineData] = useState<Kline[]>([])
+  const [klineData, setKlineDataSorted] = useState<Kline[]>([])
   const [timeframe, setTimeframe] = useState('1m')
 
   // Account state
@@ -60,11 +60,23 @@ export const TradingPage: React.FC = () => {
 
   // ── Kline Loader ───────────────────────────────────────
 
+  // Sort-safe setter: ensures data is always in ascending time order
+  const setKlineDataSortedSorted = useCallback((data: Kline[] | ((prev: Kline[]) => Kline[])) => {
+    if (typeof data === 'function') {
+      setKlineDataSorted(prev => {
+        const result = data(prev)
+        return result.sort((a, b) => (Number(a.time) - Number(b.time)))
+      })
+    } else {
+      setKlineDataSorted(data.sort((a, b) => (Number(a.time) - Number(b.time))))
+    }
+  }, [])
+
   const loadKlines = useCallback(() => {
     fetchKlines(selectedRef.current, timeframeRef.current, 500)
-      .then(setKlineData)
+      .then(d => setKlineDataSortedSorted(d))
       .catch(() => {})
-  }, [])
+  }, [setKlineDataSortedSorted])
 
   // Load kline when symbol/timeframe changes
   useEffect(() => {
@@ -105,12 +117,15 @@ export const TradingPage: React.FC = () => {
     })
 
     const unsubKline = wsClient.onKline(kline => {
-      setKlineData(prev => {
+      setKlineDataSorted(prev => {
         if (prev.length === 0) return prev
         const arr = [...prev]
         const last = arr[arr.length - 1]
-        const ktime = Math.floor(kline.time / 1000) as any
-        if (ktime === last.time) {
+        const ktime = Math.floor(kline.time / 1000) as number
+        const lastTime = last.time as number
+
+        if (ktime === lastTime) {
+          // Update current forming candle
           arr[arr.length - 1] = {
             time: ktime,
             open: kline.open,
@@ -119,7 +134,8 @@ export const TradingPage: React.FC = () => {
             close: kline.close,
             volume: kline.volume,
           }
-        } else if (ktime > (last.time as number)) {
+        } else if (ktime > lastTime) {
+          // New candle
           arr.push({
             time: ktime,
             open: kline.open,
@@ -128,6 +144,20 @@ export const TradingPage: React.FC = () => {
             close: kline.close,
             volume: kline.volume,
           })
+        } else {
+          // Stale kline (older than last) — find matching candle or ignore
+          const idx = arr.findIndex(c => (c.time as number) === ktime)
+          if (idx >= 0) {
+            arr[idx] = {
+              time: ktime,
+              open: kline.open,
+              high: Math.max(arr[idx].high, kline.high),
+              low: Math.min(arr[idx].low, kline.low),
+              close: kline.close,
+              volume: kline.volume,
+            }
+          }
+          // If no match found, silently ignore stale data
         }
         return arr
       })

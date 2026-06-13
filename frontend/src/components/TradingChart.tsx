@@ -42,12 +42,22 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const [horizLines, setHorizLines] = useState<{price: number; color: string}[]>([])
   const [showEMA, setShowEMA] = useState(true)
   const [showRSI, setShowRSI] = useState(true)
+  const [crossPoints, setCrossPoints] = useState<{symbol:string;time:any;ema20:number;ema50:number;type:'golden'|'death'}[]>([])
   const isFirstData = useRef(true)
   const crosshairPrice = useRef(0)
   const lineCount = useRef(0)
   const priceLineRefs = useRef<any[]>([])
+  const crossLineRefs = useRef<any[]>([])
   const bidLineRef = useRef<any>(null)
   const askLineRef = useRef<any>(null)
+  // Safe setData wrapper — catches errors, no crash
+  const sd = useCallback((series: any, data: any[]) => {
+    if (!series) return
+    try {
+      const sorted = [...data].sort((a: any, b: any) => Number(a.time) - Number(b.time))
+      series.setData(sorted)
+    } catch {}
+  }, [])
 
   // Calculate indicators
   const ema20Data = useMemo(() => {
@@ -228,8 +238,11 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   useEffect(() => {
     if (!candleSeries.current || !volumeSeries.current || data.length === 0) return
 
+    // Safe copy sorted by time (Lightweight Charts requires ascending order)
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+
     // Build candle data with per-bar colors
-    const candleData: CandlestickData[] = data.map((k, i) => {
+    const candleData: CandlestickData[] = sorted.map((k, i) => {
       const isForming = i === data.length - 1
       const isUp = k.close >= k.open
       let color: string
@@ -247,20 +260,16 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       }
     })
 
-    const volumeData: HistogramData[] = data.map(k => ({
+    const volumeData: HistogramData[] = sorted.map(k => ({
       time: k.time as any, value: k.volume,
       color: k.close >= k.open ? 'rgba(46, 189, 91, 0.3)' : 'rgba(242, 68, 83, 0.3)',
     }))
 
-    try {
-      candleSeries.current.setData(candleData)
-      volumeSeries.current.setData(volumeData)
-      if (isFirstData.current) {
-        chartRef.current?.timeScale().fitContent()
-        isFirstData.current = false
-      }
-    } catch (e) {
-      console.error('Chart error:', e)
+    sd(candleSeries.current, candleData)
+    sd(volumeSeries.current, volumeData)
+    if (isFirstData.current) {
+      chartRef.current?.timeScale().fitContent()
+      isFirstData.current = false
     }
   }, [data, precision])
 
@@ -268,18 +277,48 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
 
   useEffect(() => {
     if (!ema20Series.current || !ema50Series.current || data.length < 50) return
-    const t = (i: number) => data[i].time as any
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    const t = (i: number) => sorted[i].time as any
 
     const line20: LineData[] = []
     const line50: LineData[] = []
-    for (let i = 0; i < data.length; i++) {
+    for (let i = 0; i < sorted.length; i++) {
       if (ema20Data[i] !== null) line20.push({ time: t(i), value: ema20Data[i]! })
       if (ema50Data[i] !== null) line50.push({ time: t(i), value: ema50Data[i]! })
     }
-    ema20Series.current.setData(line20)
-    ema50Series.current.setData(line50)
+    sd(ema20Series.current, line20)
+    sd(ema50Series.current, line50)
     ema20Series.current.applyOptions({ visible: showEMA })
     ema50Series.current.applyOptions({ visible: showEMA })
+
+    // Detect golden cross / death cross
+    const crossMarkers: { time: any, ema20: number, ema50: number, type: 'golden' | 'death' }[] = []
+    for (let i = 1; i < ema20Data.length; i++) {
+      if (ema20Data[i] === null || ema20Data[i-1] === null || ema50Data[i] === null || ema50Data[i-1] === null) continue
+      const prev20 = ema20Data[i-1]!, prev50 = ema50Data[i-1]!
+      const curr20 = ema20Data[i]!, curr50 = ema50Data[i]!
+      // Golden cross: EMA20 crosses ABOVE EMA50
+      if (prev20 <= prev50 && curr20 > curr50) {
+        crossMarkers.push({ time: t(i), ema20: curr20, ema50: curr50, type: 'golden' })
+      }
+      // Death cross: EMA20 crosses BELOW EMA50
+      if (prev20 >= prev50 && curr20 < curr50) {
+        crossMarkers.push({ time: t(i), ema20: curr20, ema50: curr50, type: 'death' })
+      }
+    }
+
+    // Draw cross markers on chart (use price lines for prominent display)
+    setCrossPoints(prev => {
+      // Keep existing marks for the same symbol, add new
+      const existing = prev.filter(m => m.symbol !== symbol)
+      return [...existing, ...crossMarkers.map(m => ({
+        symbol,
+        time: m.time,
+        ema20: m.ema20,
+        ema50: m.ema50,
+        type: m.type,
+      }))]
+    })
   }, [data, ema20Data, ema50Data, showEMA])
 
   // ── RSI pane ─────────────────────────────────────────
@@ -310,9 +349,7 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
     for (let i = 0; i < data.length; i++) {
       if (rsiData[i] !== null) rsiLine.push({ time: data[i].time as any, value: rsiData[i]! })
     }
-    if (rsiLine.length > 0) {
-      rsiSeries.current.setData(rsiLine)
-    }
+    if (rsiLine.length > 0) sd(rsiSeries.current, rsiLine)
   }, [data, rsiData, showRSI])
 
   // Show/hide RSI scale
@@ -326,20 +363,39 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   // ── Trade markers (entry/exit arrows) ──────────────
 
   useEffect(() => {
-    if (!candleSeries.current || tradeMarkers.length === 0) return
-    const markers = tradeMarkers.map(m => ({
-      time: m.time as any,
-      position: m.type === 'entry' ? 'belowBar' as const : 'aboveBar' as const,
-      shape: (m.type === 'entry'
-        ? (m.side === 'buy' ? 'arrowUp' as const : 'arrowDown' as const)
-        : (m.side === 'buy' ? 'arrowDown' as const : 'arrowUp' as const)),
-      color: m.type === 'entry'
-        ? (m.side === 'buy' ? '#2ebd5b' : '#f24453')
-        : (m.side === 'buy' ? '#f24453' : '#2ebd5b'),
-      size: 1.5,
-    }))
+    if (!candleSeries.current) return
+    const markers: any[] = []
+
+    // Trade markers
+    for (const m of tradeMarkers) {
+      markers.push({
+        time: m.time as any,
+        position: m.type === 'entry' ? 'belowBar' : 'aboveBar',
+        shape: (m.type === 'entry'
+          ? (m.side === 'buy' ? 'arrowUp' : 'arrowDown')
+          : (m.side === 'buy' ? 'arrowDown' : 'arrowUp')),
+        color: m.type === 'entry'
+          ? (m.side === 'buy' ? '#2ebd5b' : '#f24453')
+          : (m.side === 'buy' ? '#f24453' : '#2ebd5b'),
+        size: 1.5,
+      })
+    }
+
+    // Cross markers (render as diamond-shaped markers)
+    for (const c of crossPoints) {
+      markers.push({
+        time: c.time,
+        position: 'aboveBar',
+        shape: 'diamond',
+        color: c.type === 'golden' ? '#2ebd5b' : '#f24453',
+        size: 1.5,
+        text: c.type === 'golden' ? '金叉' : '死叉',
+      })
+    }
+
+    markers.sort((a, b) => Number(a.time) - Number(b.time))
     candleSeries.current.setMarkers(markers)
-  }, [tradeMarkers])
+  }, [tradeMarkers, crossPoints])
 
   // ── Bid/Ask price lines ────────────────────────────
 
@@ -429,7 +485,22 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       }}>
         <span>{activeTool === 'horizontal' ? '✎ 点击画水平线 · 滚轮缩放' : '滚轮缩放 · 拖拽平移'}</span>
         <span>
-          {showEMA && <span style={{ marginRight: 10 }}><span style={{ color: '#f0ad4e' }}>━</span> EMA20 <span style={{ color: '#ab47bc', marginLeft: 6 }}>━</span> EMA50</span>}
+          {showEMA && (
+            <span style={{ marginRight: 10 }}>
+              <span style={{ color: '#f0ad4e' }}>━</span> EMA20
+              <span style={{ color: '#ab47bc', marginLeft: 6 }}>━</span> EMA50
+              {crossPoints.filter(c => c.symbol === symbol).length > 0 && (
+                <span style={{ marginLeft: 8 }}>
+                  {crossPoints.filter(c => c.symbol === symbol && c.type === 'golden').length > 0 &&
+                    <span style={{ color: '#2ebd5b' }}>▲{crossPoints.filter(c => c.symbol === symbol && c.type === 'golden').length}</span>
+                  }
+                  {crossPoints.filter(c => c.symbol === symbol && c.type === 'death').length > 0 &&
+                    <span style={{ color: '#f24453', marginLeft: 6 }}>▼{crossPoints.filter(c => c.symbol === symbol && c.type === 'death').length}</span>
+                  }
+                </span>
+              )}
+            </span>
+          )}
           {symbol.replace('USDT', '/USDT').replace('XAUUSD', 'XAU/USD').replace('XAGUSD', 'XAG/USD')}
         </span>
       </div>
