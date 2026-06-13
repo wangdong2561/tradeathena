@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A professional-grade quantitative trading web platform, comparable to MT4/MT5. Supports real-time cryptocurrency, gold, and silver market data with simulated trading — built to help you become a top量化交易员.
+A professional-grade quantitative trading web platform, comparable to MT4/MT5. Supports real-time cryptocurrency, gold, and silver market data with simulated trading — built to help you become a top quantitative trader.
 
 ![Screenshot](home.png)
 
