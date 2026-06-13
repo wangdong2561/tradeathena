@@ -20,13 +20,18 @@ type Tool = 'crosshair' | 'horizontal' | 'none' | 'auto'
 
 const LINE_COLORS = ['#2962ff', '#f24453', '#2ebd5b', '#f0ad4e', '#ab47bc', '#26c6da']
 
-// K-line colors
-const COLOR_UP_DONE = '#2962ff'    // 蓝色 — 收定涨
-const COLOR_DOWN_DONE = '#f24453'  // 红色 — 收定跌
-const COLOR_UP_FORM = '#00e5ff'    // 青色 — 形成中涨
-const COLOR_DOWN_FORM = '#aa00ff'  // 紫色 — 形成中跌
+// Color themes: [up_done, down_done, up_form, down_form, name]
+const COLOR_THEMES: [string, string, string, string, string][] = [
+  ['#2962ff', '#f24453', '#00e5ff', '#aa00ff', '蓝红青紫'],  // 默认
+  ['#26a69a', '#ef5350', '#80cbc4', '#ef9a9a', '绿红'],       // 绿涨红跌
+  ['#4caf50', '#ff5722', '#a5d6a7', '#ffab91', '绿橙'],
+  ['#2196f3', '#ff9800', '#90caf9', '#ffe0b2', '蓝橙'],
+  ['#9c27b0', '#f44336', '#ce93d8', '#ef9a9a', '紫红'],
+]
 
 export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [], bid = 0, ask = 0 }) => {
+  const [themeIdx, setThemeIdx] = useState(0)
+  const colors = COLOR_THEMES[themeIdx]
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const candleSeries = useRef<ISeriesApi<'Candlestick'> | null>(null)
@@ -118,9 +123,9 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
 
       // Main candlestick series
       const candles = chart.addCandlestickSeries({
-        upColor: COLOR_UP_DONE, downColor: COLOR_DOWN_DONE,
-        borderUpColor: COLOR_UP_DONE, borderDownColor: COLOR_DOWN_DONE,
-        wickUpColor: COLOR_UP_DONE, wickDownColor: COLOR_DOWN_DONE,
+        upColor: colors[0], downColor: colors[1],
+        borderUpColor: colors[0], borderDownColor: colors[1],
+        wickUpColor: colors[0], wickDownColor: colors[1],
         priceFormat: { type: 'price', precision, minMove: 0.01 },
         priceScaleId: 'right',
       })
@@ -250,9 +255,9 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       const isUp = k.close >= k.open
       let color: string
       if (isForming) {
-        color = isUp ? COLOR_UP_FORM : COLOR_DOWN_FORM
+        color = isUp ? colors[2] : colors[3]
       } else {
-        color = isUp ? COLOR_UP_DONE : COLOR_DOWN_DONE
+        color = isUp ? colors[0] : colors[1]
       }
       return {
         time: k.time as any,
@@ -462,6 +467,9 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
         <span className="separator" />
         <button className={showEMA ? 'active' : ''} onClick={() => setShowEMA(!showEMA)}>EMA</button>
         <button className={showRSI ? 'active' : ''} onClick={() => setShowRSI(!showRSI)}>RSI</button>
+        <button onClick={() => setThemeIdx((themeIdx + 1) % COLOR_THEMES.length)} title={COLOR_THEMES[(themeIdx + 1) % COLOR_THEMES.length][4]}>
+          配色 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors[0], marginLeft: 2 }} />
+        </button>
         <span className="separator" />
         {horizLines.length > 0 && (
           <button onClick={clearLines} style={{ color: 'var(--red)' }}>清除画线</button>

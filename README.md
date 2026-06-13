@@ -160,18 +160,22 @@ tradeathena/
 | Feature | Status | Description |
 |:---|:---|:---|
 | K-line Chart | ✅ | 1m/5m/15m/30m/1h/4h/6h/12h/1d/1w |
+| Dual Charts | ✅ | Side-by-side, independent timeframes, synced time axis |
+| Candle Color Themes | ✅ | Multiple color schemes, toggle in toolbar |
 | Real-time Push | ✅ | Binance WS → WebSocket → Frontend |
 | Candle Colors | ✅ | Forming: Cyan/Purple — Closed: Blue/Red |
-| Long/Short Trading | ✅ | Rust engine supports both directions |
+| Long/Short Trading | ✅ | Hedging mode, each order independent |
 | Market/Limit/Stop Orders | ✅ | Three order types |
-| SL/TP Quick Setup | ✅ | -10%~-50% + 1x~5x presets |
+| Mandatory SL | ✅ | Auto -10% stop loss on every trade |
+| SL/TP Quick Setup | ✅ | Preset % buttons + custom input |
+| Real-time P&L Calculator | ✅ | Live position P&L, entry time, per-trade display |
 | EMA 20/50 Indicators | ✅ | Toggle display |
 | Golden/Death Cross Detection | ✅ | Auto ◆ markers + counters |
 | RSI Indicator | ✅ | 14-period, overbought/oversold |
 | Horizontal Line Drawing | ✅ | Click to place, clearable |
 | Entry/Exit Markers | ✅ | Auto-arrows on chart |
 | Bid/Ask Reference Lines | ✅ | Red=Ask, Gray=Bid |
-| Order Book | ✅ | Depth display |
+| Market News Feed | ✅ | Sina Finance Chinese news, auto-refresh |
 | Account Management | ✅ | Balance/Equity/Margin/Leverage |
 | Trade History | ✅ | SQLite persistent |
 | Dark Theme | ✅ | MT5-style professional theme |
