@@ -19,9 +19,13 @@ class ModifySLTPRequest(BaseModel):
 
 @router.get("")
 async def get_positions(app=Depends(get_app_state)):
-    """Get all open positions."""
+    """Get all open positions and pending orders."""
     positions = app.engine.get_positions()
-    return {"positions": positions}
+    pending = app.engine.get_pending_orders()
+    return {
+        "positions": positions,
+        "pending_orders": pending,
+    }
 
 
 @router.put("/{position_id}")
@@ -49,9 +53,11 @@ async def close_position(position_id: int, app=Depends(get_app_state)):
     if not pos:
         raise HTTPException(status_code=404, detail="Position not found")
 
-    market_tick = app.market_service.get_tick(pos["symbol"])
+    market_tick = app.get_tick(pos["symbol"])
     if market_tick:
-        bid, ask, last = market_tick.bid, market_tick.ask, market_tick.last
+        bid = market_tick.get("bid", 0)
+        ask = market_tick.get("ask", 0)
+        last = market_tick.get("last", 0)
     else:
         bid = ask = last = pos["current_price"]
 
@@ -84,4 +90,4 @@ async def close_position(position_id: int, app=Depends(get_app_state)):
     acc["open_positions"] = len(positions)
     acc["total_unrealized_pl"] = round(sum(p["unrealized_pl"] for p in positions), 2)
     await app.ws_manager.broadcast_account_update(acc)
-    return {"success": True, "profit": round(profit, 2)}
+    return {"success": True, "profit": round(profit, 2), "exit_price": close_price, "side": pos["side"], "volume": pos["volume"]}

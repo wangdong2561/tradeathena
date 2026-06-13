@@ -21,16 +21,20 @@ class AppState:
         self.ws_manager = None       # WSManager
 
     def get_tick(self, symbol: str):
-        """Get latest tick from any data source."""
+        """Get latest tick from any data source (with price)."""
         sym = symbol.upper()
+        # Check gold client first (has XAU/XAG prices)
+        if self.gold_client:
+            t = self.gold_client.get_tick(sym)
+            if t and t.get("last", 0):
+                return t
+        # Fall back to market service (Binance crypto)
         if self.market_service:
             t = self.market_service.get_tick(sym)
             if t:
-                return t.to_dict() if hasattr(t, 'to_dict') else t
-        if self.gold_client:
-            t = self.gold_client.get_tick(sym)
-            if t:
-                return t
+                d = t.to_dict() if hasattr(t, 'to_dict') else t
+                if d.get("last", 0):
+                    return d
         return None
 
     def all_ticks(self) -> list:

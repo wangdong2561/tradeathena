@@ -61,6 +61,10 @@ export async function fetchTicker(symbol: string): Promise<Ticker> {
   return get<Ticker>(`/market/ticker/${symbol}`)
 }
 
+export async function fetchNews(): Promise<{news: {title: string; summary: string; url: string; source: string; sentiment: number}[]}> {
+  return get('/market/news')
+}
+
 export async function subscribeKline(symbol: string, interval: string): Promise<void> {
   await post('/market/subscribe-kline', { symbol, interval })
 }
@@ -94,7 +98,7 @@ export async function getPendingOrders(): Promise<{ orders: PendingOrder[] }> {
 
 // ── Positions ─────────────────────────────────────────
 
-export async function getPositions(): Promise<{ positions: Position[] }> {
+export async function getPositions(): Promise<{ positions: Position[]; pending_orders?: PendingOrder[] }> {
   return get('/positions')
 }
 
@@ -102,7 +106,7 @@ export async function modifyPosition(positionId: number, sl: number, tp: number)
   return put(`/positions/${positionId}`, { stop_loss: sl, take_profit: tp })
 }
 
-export async function closePosition(positionId: number): Promise<{ success: boolean }> {
+export async function closePosition(positionId: number): Promise<{ success: boolean; exit_price?: number; side?: string; profit?: number }> {
   return post(`/positions/${positionId}/close`)
 }
 

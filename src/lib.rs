@@ -93,6 +93,7 @@ impl PyMatchingEngine {
                 "stop_loss" => p.stop_loss,
                 "take_profit" => p.take_profit,
                 "unrealized_pl" => p.unrealized_pl,
+                "created_at" => p.created_at as i64,
             )
         }).collect();
         Ok(items.into_py(py))

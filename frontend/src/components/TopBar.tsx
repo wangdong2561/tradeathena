@@ -5,34 +5,22 @@ interface Props {
   symbols: string[]
   selectedSymbol: string
   onSymbolChange: (s: string) => void
-  timeframe: string
-  onTimeframeChange: (t: string) => void
   account: Account | null
 }
 
-const TIMEFRAMES = ['1m', '3m', '5m', '15m', '30m', '1h', '2h', '4h', '6h', '12h', '1d', '1w']
-
 interface SymbolInfo {
-  name: string
-  full_name: string
-  type: string
-  exchange: string
-  trading_hours: string
-  trading_hours_cn: string
-  leverage_max: number
-  lot_min: number
-  description: string
+  name: string; full_name: string; type: string; exchange: string
+  trading_hours: string; trading_hours_cn: string; leverage_max: number
+  lot_min: number; description: string
 }
 
 export const TopBar: React.FC<Props> = ({
-  symbols, selectedSymbol, onSymbolChange,
-  timeframe, onTimeframeChange, account,
+  symbols, selectedSymbol, onSymbolChange, account,
 }) => {
   const [info, setInfo] = useState<SymbolInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
   const infoRef = useRef<HTMLDivElement>(null)
 
-  // Fetch symbol info when selection changes
   useEffect(() => {
     fetch(`/api/v1/market/symbol-info/${selectedSymbol}`)
       .then(r => r.json())
@@ -40,13 +28,10 @@ export const TopBar: React.FC<Props> = ({
       .catch(() => setInfo(null))
   }, [selectedSymbol])
 
-  // Close info on click outside
   useEffect(() => {
     if (!showInfo) return
     const handler = (e: MouseEvent) => {
-      if (infoRef.current && !infoRef.current.contains(e.target as Node)) {
-        setShowInfo(false)
-      }
+      if (infoRef.current && !infoRef.current.contains(e.target as Node)) setShowInfo(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -64,95 +49,45 @@ export const TopBar: React.FC<Props> = ({
         ))}
       </select>
 
-      <button
-        onClick={() => setShowInfo(!showInfo)}
-        style={{
-          background: 'transparent', border: '1px solid var(--border)',
-          color: 'var(--text-secondary)', borderRadius: 3, padding: '1px 6px',
-          fontSize: 11, cursor: 'pointer', fontFamily: 'var(--font-sans)',
-        }}
-        title="品种信息"
-      >
-        ⓘ
-      </button>
+      <button onClick={() => setShowInfo(!showInfo)}
+        style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-secondary)', borderRadius: 3, padding: '1px 6px', fontSize: 11, cursor: 'pointer' }}
+        title="品种信息">ⓘ</button>
 
-      {/* Symbol info popup */}
       {showInfo && info && (
-        <div
-          ref={infoRef}
-          style={{
-            position: 'fixed', top: 44, left: 160, zIndex: 2000,
-            background: 'var(--bg-secondary)', border: '1px solid var(--border)',
-            borderRadius: 6, padding: 14, width: 320,
-            fontSize: 12, lineHeight: 1.6,
-            boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-          }}
-        >
+        <div ref={infoRef} style={{
+          position: 'fixed', top: 44, left: 160, zIndex: 2000,
+          background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+          borderRadius: 6, padding: 14, width: 320,
+          fontSize: 12, lineHeight: 1.6,
+          boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+        }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 8 }}>
-            {info.name}
-            <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>{info.full_name}</span>
+            {info.name} <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 6 }}>{info.full_name}</span>
           </div>
-
           <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 10px' }}>
-            <span style={{ color: 'var(--text-secondary)' }}>类型</span>
-            <span>{info.type}</span>
-
-            <span style={{ color: 'var(--text-secondary)' }}>交易所</span>
-            <span>{info.exchange}</span>
-
-            <span style={{ color: 'var(--text-secondary)' }}>交易时间</span>
-            <span style={{ color: 'var(--green)', fontWeight: 500, whiteSpace: 'pre-line' }}>
-              {info.trading_hours}
-            </span>
-
-            <span style={{ color: 'var(--text-secondary)' }}>休市</span>
-            <span style={{ color: 'var(--red)', fontSize: 11 }}>{info.trading_hours_cn}</span>
-
-            <span style={{ color: 'var(--text-secondary)' }}>最大杠杆</span>
-            <span>1:{info.leverage_max}</span>
-
-            <span style={{ color: 'var(--text-secondary)' }}>最小手数</span>
-            <span>{info.lot_min}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>类型</span><span>{info.type}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>交易所</span><span>{info.exchange}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>交易时间</span><span style={{ color: 'var(--green)', fontWeight: 500, whiteSpace: 'pre-line' }}>{info.trading_hours}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>休市</span><span style={{ color: 'var(--red)', fontSize: 11 }}>{info.trading_hours_cn}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>最大杠杆</span><span>1:{info.leverage_max}</span>
+            <span style={{ color: 'var(--text-secondary)' }}>最小手数</span><span>{info.lot_min}</span>
           </div>
-
           <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)', fontSize: 11, color: 'var(--text-secondary)' }}>
             {info.description}
           </div>
-
           <div style={{ marginTop: 6, fontSize: 10, color: 'var(--text-muted)' }}>
             时间均为东欧时间 (EET, UTC+2/UTC+3)
           </div>
         </div>
       )}
 
-      <div className="timeframes">
-        {TIMEFRAMES.map(t => (
-          <button key={t} className={t === timeframe ? 'active' : ''} onClick={() => onTimeframeChange(t)}>
-            {t}
-          </button>
-        ))}
-      </div>
-
       {account && (
         <div className="account-summary">
-          <div className="item">
-            <span className="label">余额</span>
-            <span className="value">${account.balance.toFixed(2)}</span>
-          </div>
-          <div className="item">
-            <span className="label">净值</span>
-            <span className="value">${account.equity.toFixed(2)}</span>
-          </div>
-          <div className="item">
-            <span className="label">保证金</span>
-            <span className="value">${account.margin.toFixed(2)}</span>
-          </div>
-          <div className="item">
-            <span className="label">可用</span>
-            <span className="value">${account.free_margin.toFixed(2)}</span>
-          </div>
-          <div className="item">
-            <span className="label">浮动盈亏</span>
+          <div className="item"><span className="label">余额</span><span className="value">${account.balance.toFixed(2)}</span></div>
+          <div className="item"><span className="label">净值</span><span className="value">${account.equity.toFixed(2)}</span></div>
+          <div className="item"><span className="label">保证金</span><span className="value">${account.margin.toFixed(2)}</span></div>
+          <div className="item"><span className="label">可用</span><span className="value">${account.free_margin.toFixed(2)}</span></div>
+          <div className="item"><span className="label">浮动盈亏</span>
             <span className={`value ${account.total_unrealized_pl >= 0 ? 'green' : 'red'}`}>
               ${account.total_unrealized_pl.toFixed(2)}
             </span>

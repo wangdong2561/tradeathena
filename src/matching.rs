@@ -179,6 +179,8 @@ impl MatchingEngine {
         }
 
         self.open_or_add_position(symbol, side, volume, fill_price, stop_loss, take_profit);
+        // In hedging mode, opposite-side positions are NOT closed here.
+        // Use close_position_by_id to close specific positions.
 
         TradeResult {
             order_id,
@@ -195,35 +197,13 @@ impl MatchingEngine {
         &mut self,
         symbol: &str,
         side: Side,
-        mut volume: f64,
+        volume: f64,
         price: f64,
         stop_loss: f64,
         take_profit: f64,
     ) {
-        // Netting: same side → add to position
-        for pos in &mut self.positions {
-            if pos.symbol == symbol && pos.side == side {
-                let total_volume = pos.volume + volume;
-                pos.entry_price =
-                    (pos.entry_price * pos.volume + price * volume) / total_volume;
-                pos.volume = total_volume;
-                pos.current_price = price;
-                if stop_loss > 0.0 {
-                    pos.stop_loss = stop_loss;
-                }
-                if take_profit > 0.0 {
-                    pos.take_profit = take_profit;
-                }
-                pos.unrealized_pl =
-                    Self::calc_unrealized_pl(pos.side, pos.volume, pos.entry_price, price);
-                return;
-            }
-        }
-
-        // Opposite side → close or reduce
-        self.close_opposite_position(symbol, side, &mut volume, price);
-
-        // Still volume left → open new
+        // Hedging mode: each order creates a NEW position.
+        // No merging, no opposite-side closing. Close only via close_position_by_id.
         if volume > 0.0 {
             self.positions.push(Position {
                 id: NEXT_POSITION_ID.fetch_add(1, Ordering::Relaxed),
@@ -236,6 +216,9 @@ impl MatchingEngine {
                 stop_loss,
                 take_profit,
                 unrealized_pl: 0.0,
+                created_at: std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default().as_secs() as i64,
             });
         }
 

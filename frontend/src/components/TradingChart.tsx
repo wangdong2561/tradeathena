@@ -50,6 +50,8 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const crossLineRefs = useRef<any[]>([])
   const bidLineRef = useRef<any>(null)
   const askLineRef = useRef<any>(null)
+  // No timezone conversion — data source uses UTC, chart displays UTC
+
   // Safe setData wrapper — catches errors, no crash
   const sd = useCallback((series: any, data: any[]) => {
     if (!series) return
@@ -240,6 +242,7 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
 
     // Safe copy sorted by time (Lightweight Charts requires ascending order)
     const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    // Timestamps are UTC (as provided by data source)
 
     // Build candle data with per-bar colors
     const candleData: CandlestickData[] = sorted.map((k, i) => {
@@ -260,7 +263,7 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       }
     })
 
-    const volumeData: HistogramData[] = sorted.map(k => ({
+    const volumeData: HistogramData[] = sorted.map((k: any) => ({
       time: k.time as any, value: k.volume,
       color: k.close >= k.open ? 'rgba(46, 189, 91, 0.3)' : 'rgba(242, 68, 83, 0.3)',
     }))
@@ -366,18 +369,21 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
     if (!candleSeries.current) return
     const markers: any[] = []
 
-    // Trade markers
+    // Trade markers (entry: below bar, exit: above bar, with price label)
     for (const m of tradeMarkers) {
+      const isBuy = m.side === 'buy'
+      const isEntry = m.type === 'entry'
       markers.push({
         time: m.time as any,
-        position: m.type === 'entry' ? 'belowBar' : 'aboveBar',
-        shape: (m.type === 'entry'
-          ? (m.side === 'buy' ? 'arrowUp' : 'arrowDown')
-          : (m.side === 'buy' ? 'arrowDown' : 'arrowUp')),
-        color: m.type === 'entry'
-          ? (m.side === 'buy' ? '#2ebd5b' : '#f24453')
-          : (m.side === 'buy' ? '#f24453' : '#2ebd5b'),
+        position: isEntry ? 'belowBar' : 'aboveBar',
+        shape: isEntry
+          ? (isBuy ? 'arrowUp' : 'arrowDown')
+          : (isBuy ? 'arrowDown' : 'arrowUp'),
+        color: isEntry
+          ? (isBuy ? '#2ebd5b' : '#f24453')
+          : (isBuy ? '#f24453' : '#2ebd5b'),
         size: 1.5,
+        text: `${isEntry ? 'B' : 'S'} $${m.price.toFixed(2)}`,
       })
     }
 
@@ -412,7 +418,7 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
     if (bid > 0) {
       bidLineRef.current = candleSeries.current.createPriceLine({
         price: bid,
-        color: '#666666',
+        color: '#999999',
         lineWidth: 1,
         lineStyle: 2,
         axisLabelVisible: true,

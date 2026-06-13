@@ -29,13 +29,10 @@ class ModifyOrderRequest(BaseModel):
 @router.post("")
 async def place_order(req: PlaceOrderRequest, app=Depends(get_app_state)):
     """Place an order via the Rust matching engine."""
-    import logging
-    logging.getLogger("toptrader").info("Order request: %s", req.model_dump())
     sym = req.symbol.upper()
-    tick = app.market_service.get_tick(sym)
-    bid = tick.bid if tick else 0.0
-    ask = tick.ask if tick else 0.0
-    last = tick.last if tick else 0.0
+    tick = app.get_tick(sym)
+    bid = tick.get("bid", 0) if tick else 0.0
+    ask = tick.get("ask", 0) if tick else 0.0
 
     result = app.engine.place_order(
         sym, req.side, req.order_type, req.volume,

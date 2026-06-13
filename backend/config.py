@@ -4,9 +4,10 @@ import os
 
 
 class Settings:
-    database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./toptrader.db")
+    database_url: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./tradeathena.db")
     default_balance: float = float(os.getenv("DEFAULT_BALANCE", "10000.0"))
     max_leverage: int = int(os.getenv("MAX_LEVERAGE", "100"))
+    alpha_vantage_key: str = os.getenv("ALPHA_VANTAGE_KEY", "VPTKR2Z5XYDCZZZY")
     default_symbols: list[str] = [
         "BTCUSDT",      # Crypto (Binance)
         "XAUUSD",       # Gold (gold-api.com)

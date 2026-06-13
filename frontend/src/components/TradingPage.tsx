@@ -1,30 +1,31 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
-import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, resetAccount, subscribeKline } from '../api'
+import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, subscribeKline, fetchNews } from '../api'
 import { wsClient } from '../websocket'
 import type { Ticker, Account, Kline, Position, PendingOrder, TradeResult, TradeMarker } from '../types'
 
 import { TopBar } from './TopBar'
 import { MarketWatch } from './MarketWatch'
 import { TradingChart } from './TradingChart'
-import { OrderBook } from './OrderBook'
 import { OrderPanel } from './OrderPanel'
 import { PositionsTable } from './PositionsTable'
 import { OrdersTable } from './OrdersTable'
 import { HistoryTable } from './HistoryTable'
-import { AccountInfo } from './AccountInfo'
 
 import '../styles.css'
 
 type Tab = 'trade' | 'positions' | 'orders' | 'history'
 
 export const TradingPage: React.FC = () => {
-  // Clock
-  const [clock, setClock] = useState('')
+  // Clocks: UTC in marketwatch, Beijing in statusbar
+  const [utcClock, setUtcClock] = useState('')
+  const [bjClock, setBjClock] = useState('')
   useEffect(() => {
     const tick = () => {
-      setClock(new Date().toLocaleString('zh-CN', { timeZone: 'Europe/Bucharest', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      const d = new Date()
+      setUtcClock(d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC')
+      setBjClock(d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
     }
     tick()
     const iv = setInterval(tick, 1000)
@@ -35,7 +36,20 @@ export const TradingPage: React.FC = () => {
   const [selectedSymbol, setSelectedSymbol] = useState('BTCUSDT')
   const [ticks, setTicks] = useState<Record<string, Ticker>>({})
   const [klineData, setKlineDataSorted] = useState<Kline[]>([])
-  const [timeframe, setTimeframe] = useState('1m')
+  const [klineData2, setKlineData2] = useState<Kline[]>([])
+  // Left chart = 1m (波动, 找成交时机)  |  Right chart = 1h (趋势, 看方向)
+  const [timeframe, setTimeframe] = useState('1m')   // left - entry timing
+  const [timeframe2, setTimeframe2] = useState('1h') // right - trend direction
+
+  // Auto-calculate: when right chart changes, sync left accordingly
+  const tfMap: Record<string, string> = {
+    '1m': '1m', '3m': '1m', '5m': '1m', '15m': '1m', '30m': '1m',
+    '1h': '1m', '2h': '1m', '4h': '1m', '6h': '1m', '12h': '1m', '1d': '1m',
+  }
+  const updateTimeframe2 = useCallback((tf: string) => {
+    setTimeframe2(tf)
+    setTimeframe(tfMap[tf] || '1m')
+  }, [])
 
   // Account state
   const [account, setAccount] = useState<Account | null>(null)
@@ -47,12 +61,17 @@ export const TradingPage: React.FC = () => {
   const [connected, setConnected] = useState(false)
   const [orderMessage, setOrderMessage] = useState<string | null>(null)
   const [tradeMarkers, setTradeMarkers] = useState<TradeMarker[]>([])
+  const [newsItems, setNewsItems] = useState<{title:string;summary:string;url:string;source:string;sentiment:number}[]>([])
   const markerId = useRef(0)
 
   const selectedRef = useRef(selectedSymbol)
   const timeframeRef = useRef(timeframe)
   selectedRef.current = selectedSymbol
   timeframeRef.current = timeframe
+  const selectedRef2 = useRef(selectedSymbol)
+  const timeframeRef2 = useRef(timeframe2)
+  selectedRef2.current = selectedSymbol
+  timeframeRef2.current = timeframe2
 
   // ── Initial Data Load ──────────────────────────────────
 
@@ -64,7 +83,7 @@ export const TradingPage: React.FC = () => {
       setTicks(tickMap)
     }).catch(() => {})
     getAccount().then(setAccount).catch(() => {})
-    getPositions().then(r => setPositions(r.positions)).catch(() => {})
+    getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
     getPendingOrders().then(r => setPendingOrders(r.orders)).catch(() => {})
   }, [])
 
@@ -83,16 +102,37 @@ export const TradingPage: React.FC = () => {
   }, [])
 
   const loadKlines = useCallback(() => {
-    fetchKlines(selectedRef.current, timeframeRef.current, 500)
+    const limit = timeframeRef.current === '1h' ? 48 : timeframeRef.current === '1d' ? 7 : 200
+    fetchKlines(selectedRef.current, timeframeRef.current, limit)
       .then(d => setKlineDataSortedSorted(d))
       .catch(() => {})
   }, [setKlineDataSortedSorted])
+
+  const loadKlines2 = useCallback(() => {
+    fetchKlines(selectedRef2.current, timeframeRef2.current, 200)
+      .then(setKlineData2)
+      .catch(() => {})
+  }, [])
 
   // Load kline when symbol/timeframe changes
   useEffect(() => {
     loadKlines()
     subscribeKline(selectedSymbol, timeframe).catch(() => {})
   }, [selectedSymbol, timeframe, loadKlines])
+
+  useEffect(() => {
+    loadKlines2()
+    subscribeKline(selectedSymbol, timeframe2).catch(() => {})
+  }, [selectedSymbol, timeframe2, loadKlines2])
+
+  // ── News ────────────────────────────────────────────────
+  useEffect(() => {
+    fetchNews().then(d => setNewsItems(d.news)).catch(() => {})
+    const iv = setInterval(() => {
+      fetchNews().then(d => setNewsItems(d.news)).catch(() => {})
+    }, 300000)
+    return () => clearInterval(iv)
+  }, [])
 
   // ── WebSocket ──────────────────────────────────────────
 
@@ -116,61 +156,52 @@ export const TradingPage: React.FC = () => {
       wsConnected = true
       setConnected(true)
       setAccount(acc)
-      getPositions().then(r => setPositions(r.positions)).catch(() => {})
+      getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
       getPendingOrders().then(r => setPendingOrders(r.orders)).catch(() => {})
     })
 
     const unsubOrder = wsClient.onOrderUpdate(() => {
       getAccount().then(setAccount).catch(() => {})
-      getPositions().then(r => setPositions(r.positions)).catch(() => {})
+      getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
       getPendingOrders().then(r => setPendingOrders(r.orders)).catch(() => {})
     })
 
-    const unsubKline = wsClient.onKline(kline => {
-      setKlineDataSorted(prev => {
-        if (prev.length === 0) return prev
-        const arr = [...prev]
-        const last = arr[arr.length - 1]
-        const ktime = Math.floor(kline.time / 1000) as number
-        const lastTime = last.time as number
+    // Helper: update a kline data array with incoming WS kline
+    const updateKlineArr = (prev: Kline[], kline: any): Kline[] => {
+      if (prev.length === 0) return prev
+      const arr = [...prev]
+      const last = arr[arr.length - 1]
+      const ktime = Math.floor(kline.time / 1000) as number
+      const lastTime = last.time as number
 
-        if (ktime === lastTime) {
-          // Update current forming candle
-          arr[arr.length - 1] = {
-            time: ktime,
-            open: kline.open,
-            high: Math.max(last.high, kline.high),
-            low: Math.min(last.low, kline.low),
-            close: kline.close,
-            volume: kline.volume,
-          }
-        } else if (ktime > lastTime) {
-          // New candle
-          arr.push({
-            time: ktime,
-            open: kline.open,
-            high: kline.high,
-            low: kline.low,
-            close: kline.close,
-            volume: kline.volume,
-          })
-        } else {
-          // Stale kline (older than last) — find matching candle or ignore
-          const idx = arr.findIndex(c => (c.time as number) === ktime)
-          if (idx >= 0) {
-            arr[idx] = {
-              time: ktime,
-              open: kline.open,
-              high: Math.max(arr[idx].high, kline.high),
-              low: Math.min(arr[idx].low, kline.low),
-              close: kline.close,
-              volume: kline.volume,
-            }
-          }
-          // If no match found, silently ignore stale data
+      if (ktime === lastTime) {
+        arr[arr.length - 1] = {
+          time: ktime, open: kline.open,
+          high: Math.max(last.high, kline.high),
+          low: Math.min(last.low, kline.low),
+          close: kline.close, volume: kline.volume,
         }
-        return arr
-      })
+      } else if (ktime > lastTime) {
+        arr.push({ time: ktime, open: kline.open, high: kline.high, low: kline.low, close: kline.close, volume: kline.volume })
+      } else {
+        const idx = arr.findIndex(c => (c.time as number) === ktime)
+        if (idx >= 0) {
+          arr[idx] = { time: ktime, open: kline.open, high: Math.max(arr[idx].high, kline.high), low: Math.min(arr[idx].low, kline.low), close: kline.close, volume: kline.volume }
+        }
+      }
+      return arr
+    }
+
+    const unsubKline = wsClient.onKline(kline => {
+      if (kline.symbol && selectedRef.current !== kline.symbol) return
+      const interval = kline.interval || ''
+      // Route to correct chart based on interval
+      if (interval === timeframeRef.current) {
+        setKlineDataSorted(prev => updateKlineArr(prev, kline))
+      }
+      if (interval === timeframeRef2.current) {
+        setKlineData2(prev => updateKlineArr(prev, kline))
+      }
     })
 
     return () => {
@@ -188,7 +219,7 @@ export const TradingPage: React.FC = () => {
   useEffect(() => {
     const iv = setInterval(() => {
       getAccount().then(setAccount).catch(() => {})
-      getPositions().then(r => setPositions(r.positions)).catch(() => {})
+      getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
     }, 5000)
     return () => clearInterval(iv)
   }, [])
@@ -200,7 +231,7 @@ export const TradingPage: React.FC = () => {
     setTimeout(() => setOrderMessage(null), 4000)
     // Refresh account and positions
     getAccount().then(setAccount).catch(() => {})
-    getPositions().then(r => setPositions(r.positions)).catch(() => {})
+    getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
     getPendingOrders().then(r => setPendingOrders(r.orders)).catch(() => {})
     // Add entry marker on filled order
     if (result.filled && klineData.length > 0 && result.side) {
@@ -216,17 +247,6 @@ export const TradingPage: React.FC = () => {
     }
   }, [klineData])
 
-  const handleResetAccount = useCallback(async () => {
-    try {
-      await resetAccount()
-      getAccount().then(setAccount).catch(() => {})
-      setPositions([])
-      setPendingOrders([])
-    } catch (e: any) {
-      alert('重置失败: ' + e.message)
-    }
-  }, [])
-
   const currentTicker = ticks[selectedSymbol] || null
 
   return (
@@ -235,26 +255,82 @@ export const TradingPage: React.FC = () => {
         symbols={symbols}
         selectedSymbol={selectedSymbol}
         onSymbolChange={setSelectedSymbol}
-        timeframe={timeframe}
-        onTimeframeChange={setTimeframe}
         account={account}
       />
 
-      <PanelGroup direction="vertical" autoSaveId="main2" style={{ flex: 1, minHeight: 0 }}>
-        <Panel defaultSize={75} minSize={40}>
-          <PanelGroup direction="horizontal" autoSaveId="main-h2" style={{ height: '100%' }}>
-            <Panel defaultSize={15} minSize={10} maxSize={25}>
-              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} clock={clock} />
+      <PanelGroup direction="vertical" autoSaveId="main5" style={{ flex: 1, minHeight: 0 }}>
+        <Panel defaultSize={55} minSize={35}>
+          <PanelGroup direction="horizontal" autoSaveId="charts-h" style={{ height: '100%' }}>
+            <Panel defaultSize={12} minSize={8} maxSize={20}>
+              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} clock={utcClock} />
             </Panel>
             <PanelResizeHandle className="resize-handle resize-handle-h" />
-            <Panel minSize={40}>
-              <TradingChart key={selectedSymbol + timeframe} data={klineData} symbol={selectedSymbol} tradeMarkers={tradeMarkers} bid={currentTicker?.bid} ask={currentTicker?.ask} />
+            <Panel minSize={30}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ height: 30, display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{selectedSymbol.replace('USDT', '/USDT').replace('XAUUSD', 'XAU/USD').replace('XAGUSD', 'XAG/USD')}</span>
+                  <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginLeft: 4 }}>1m 波动</span>
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <TradingChart key={selectedSymbol + timeframe} data={klineData} symbol={selectedSymbol} tradeMarkers={tradeMarkers} bid={currentTicker?.bid} ask={currentTicker?.ask} />
+                </div>
+                <div style={{ height: 80, padding: '4px 10px', background: 'var(--bg-primary)', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, overflowY: 'auto' }}>
+                  <div style={{ fontWeight: 600, fontSize: 9, color: 'var(--text-secondary)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>实时盈亏</div>
+                  {positions.length > 0 ? positions.map(p => {
+                    const tick = ticks[p.symbol]
+                    const curr = tick ? (p.side === 'buy' ? tick.bid : tick.ask) : p.current_price
+                    const pl = p.side === 'buy' ? (curr - p.entry_price) * p.volume : (p.entry_price - curr) * p.volume
+                    return (
+                      <div key={p.id} style={{ display: 'flex', gap: 6, alignItems: 'center', padding: '1px 0', fontSize: 10 }}>
+                        <span style={{ color: p.side === 'buy' ? 'var(--green)' : 'var(--red)', fontWeight: 600, width: 24 }}>{p.side === 'buy' ? '多' : '空'}</span>
+                        <span style={{ width: 44 }}>{p.symbol.replace('USDT','').replace('XAUUSD','XAU').replace('XAGUSD','XAG')}</span>
+                        <span style={{ color: 'var(--text-muted)', width: 82 }}>开 {p.entry_price.toFixed(2)}</span>
+                        <span style={{ color: 'var(--text-muted)', width: 80 }}>现 {curr.toFixed(2)}</span>
+                        <span style={{ width: 40 }}>{p.volume.toFixed(3)}</span>
+                        <span style={{ fontWeight: 600, color: pl >= 0 ? 'var(--green)' : 'var(--red)', width: 56 }}>${pl.toFixed(2)}</span>
+                        <span style={{ color: 'var(--text-muted)', width: 65, fontSize: 9, fontFamily: 'var(--font-mono)' }}>
+                          {p.created_at ? new Date(p.created_at * 1000).toISOString().slice(11, 16) + ' UTC' : ''}
+                        </span>
+                      </div>
+                    )
+                  }) : (
+                    <div style={{ color: 'var(--text-muted)', fontSize: 10, padding: '4px 0' }}>暂无持仓</div>
+                  )}
+                </div>
+              </div>
             </Panel>
             <PanelResizeHandle className="resize-handle resize-handle-h" />
-            <Panel defaultSize={16} minSize={12} maxSize={25}>
-              <div className="right-panel">
-                <OrderBook symbol={selectedSymbol} ticker={currentTicker} />
-                <AccountInfo account={account} onReset={handleResetAccount} />
+            <Panel defaultSize={35} minSize={25}>
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <div style={{ height: 30, display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{selectedSymbol.replace('USDT', '/USDT').replace('XAUUSD', 'XAU/USD').replace('XAGUSD', 'XAG/USD')}</span>
+                  <div style={{ display: 'flex', gap: 2 }}>
+                    {['1m','5m','15m','1h','4h','1d'].map(t => (
+                      <button key={t} onClick={() => updateTimeframe2(t)}
+                        style={{ background: 'transparent', border: 'none', color: timeframe2 === t ? 'var(--accent)' : 'var(--text-secondary)', padding: '1px 5px', fontSize: 10, cursor: 'pointer', borderRadius: 2 }}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <TradingChart key={'c2'+selectedSymbol+timeframe2} data={klineData2} symbol={selectedSymbol} tradeMarkers={[]} />
+                </div>
+                {/* News ticker at chart bottom */}
+                <div style={{ height: 48, padding: '3px 10px', background: 'var(--bg-primary)', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', gap: 14, overflowX: 'auto', whiteSpace: 'nowrap', height: '100%', alignItems: 'center' }}>
+                    <span style={{ color: 'var(--text-secondary)', fontWeight: 600, fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.5px', flexShrink: 0 }}>📰 影响因素</span>
+                    {newsItems.length > 0 ? newsItems.slice(0, 8).map((item, i) => (
+                      <a key={i} href={item.url} target="_blank" rel="noopener noreferrer"
+                        style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        <span style={{ color: 'var(--text-muted)', fontSize: 10, cursor: 'pointer' }}>{item.title.slice(0, 50)}</span>
+                        <span style={{ color: 'var(--text-secondary)', fontSize: 8 }}>{item.source}</span>
+                      </a>
+                    )) : (
+                      <span style={{ color: 'var(--text-muted)', fontSize: 10 }}>加载中...</span>
+                    )}
+                  </div>
+                </div>
               </div>
             </Panel>
           </PanelGroup>
@@ -262,7 +338,7 @@ export const TradingPage: React.FC = () => {
 
         <PanelResizeHandle className="resize-handle resize-handle-v" />
 
-        <Panel defaultSize={25} minSize={12}>
+        <Panel defaultSize={45} minSize={30}>
           <div className="terminal">
             <div className="terminal-tabs">
               <button className={terminalTab === 'trade' ? 'active' : ''} onClick={() => setTerminalTab('trade')}>交易</button>
@@ -279,21 +355,10 @@ export const TradingPage: React.FC = () => {
                 <OrderPanel symbol={selectedSymbol} ticker={currentTicker} account={account} onOrderResult={handleOrderResult} />
               )}
               {terminalTab === 'positions' && (
-                <PositionsTable positions={positions} onClose={(_id, pos) => {
-                  getPositions().then(r => setPositions(r.positions)).catch(() => {})
+                <PositionsTable positions={positions} onClose={() => {
+                  getPositions().then(r => { setPositions(r.positions); if (r.pending_orders) setPendingOrders(r.pending_orders) }).catch(() => {})
                   getAccount().then(setAccount).catch(() => {})
-                  // Add exit marker
-                  if (pos && klineData.length > 0) {
-                    const lastTime = klineData[klineData.length - 1].time as number
-                    markerId.current += 1
-                    setTradeMarkers(prev => [...prev, {
-                      id: `exit-${markerId.current}`,
-                      type: 'exit',
-                      side: pos.side,
-                      price: pos.current_price,
-                      time: lastTime,
-                    }])
-                  }
+                  setTradeMarkers([])  // clear all markers after close
                 }} />
               )}
               {terminalTab === 'orders' && (
@@ -334,7 +399,7 @@ export const TradingPage: React.FC = () => {
             </span></span>
           </>
         )}
-        <span style={{ marginLeft: 'auto' }}>TradeAthena v0.1.0</span>
+        <span style={{ marginLeft: 'auto' }}>{bjClock} 北京</span>
       </div>
     </div>
   )

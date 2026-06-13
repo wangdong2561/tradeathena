@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect } from 'react'
 import { placeOrder } from '../api'
 import type { Ticker, Account, TradeResult } from '../types'
 
@@ -9,17 +9,28 @@ interface Props {
   onOrderResult: (r: TradeResult) => void
 }
 
-const VOLUMES = [0.01, 0.05, 0.1, 0.5, 1.0]
 const SL_PCTS = [5, 10, 20, 30]       // -5%, -10%, -20%, -30%
 const TP_MULTS = [1, 2, 3, 5]          // 1x, 2x, 3x, 5x
 
+const SYM_VOLUMES: Record<string, {def:number; presets:number[]}> = {
+  BTCUSDT: { def: 0.3, presets: [0.1, 0.3, 0.5, 1.0, 2.0] },
+  XAUUSD:  { def: 0.2, presets: [0.05, 0.1, 0.2, 0.5, 1.0] },
+  XAGUSD:  { def: 0.05, presets: [0.01, 0.05, 0.1, 0.5, 1.0] },
+}
+
 export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderResult }) => {
   const [orderType, setOrderType] = useState<string>('market')
-  const [volume, setVolume] = useState(0.1)
+  const defVol = SYM_VOLUMES[symbol]?.def || 0.3
+  const [volume, setVolume] = useState(defVol)
+
+  // Reset volume on symbol change
+  useEffect(() => { setVolume(SYM_VOLUMES[symbol]?.def || 0.3) }, [symbol])
   const [price, setPrice] = useState('')
   const [stopPrice, setStopPrice] = useState('')
   const [stopLoss, setStopLoss] = useState('')
   const [takeProfit, setTakeProfit] = useState('')
+  const [slCustom, setSlCustom] = useState('')
+  const [tpCustom, setTpCustom] = useState('')
 
   const buyPrice = ticker?.ask || 0
   const sellPrice = ticker?.bid || 0
@@ -45,6 +56,11 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
   }, [midPrice, stopLoss])
 
   const handleSubmit = async (side: 'buy' | 'sell') => {
+    // Default SL: -10% if not set
+    const entryPrice = side === 'buy' ? buyPrice : sellPrice
+    const slPrice = stopLoss ? parseFloat(stopLoss) : (entryPrice > 0
+      ? (side === 'buy' ? entryPrice * 0.9 : entryPrice * 1.1)
+      : 0)
     try {
       const result = await placeOrder({
         symbol,
@@ -53,7 +69,7 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
         volume,
         price: price ? parseFloat(price) : 0,
         stop_price: stopPrice ? parseFloat(stopPrice) : 0,
-        stop_loss: stopLoss ? parseFloat(stopLoss) : 0,
+        stop_loss: slPrice,
         take_profit: takeProfit ? parseFloat(takeProfit) : 0,
       })
       onOrderResult(result)
@@ -81,7 +97,7 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
         <label>手数</label>
         <input type="number" step={0.01} min={0.001} value={volume} onChange={e => setVolume(parseFloat(e.target.value) || 0)} />
         <div className="volume-btns">
-          {VOLUMES.map(v => (
+          {(SYM_VOLUMES[symbol]?.presets || [0.1, 0.3, 0.5, 1.0]).map(v => (
             <button key={v} className={volume === v ? 'active' : ''} onClick={() => setVolume(v)}>{v}</button>
           ))}
         </div>
@@ -101,92 +117,54 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
         </div>
       )}
 
-      {/* ═══ 止损 (SL) 快速设置 ═══ */}
+      {/* SL/TP preset buttons (compact, last slot = custom input) */}
       <div className="field" style={{ gridColumn: '1 / -1' }}>
-        <label>止损 SL</label>
-        <input
-          type="number" step={0.01}
-          value={stopLoss} onChange={e => setStopLoss(e.target.value)}
-          placeholder="手动输入价格"
-          style={{ marginBottom: 4 }}
-        />
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 2 }}>
+          <span style={{ fontSize: 10, color: 'var(--text-secondary)', minWidth: 24 }}>SL</span>
           {SL_PCTS.map(p => (
-            <button
-              key={p}
-              onClick={() => applySL(p)}
-              style={{
-                flex: 1, minWidth: 50, padding: '3px 2px', fontSize: 10,
-                background: 'var(--bg-tertiary)', color: 'var(--red)',
-                border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
+            <button key={p} onClick={() => applySL(p)} className={stopLoss ? 'active' : ''}
+              style={{ flex: 1, padding: '2px 0', fontSize: 10, background: 'var(--bg-tertiary)', color: 'var(--red)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
               -{p}%
             </button>
           ))}
-          <button
-            onClick={() => { setStopLoss(''); setTakeProfit('') }}
-            style={{
-              padding: '3px 8px', fontSize: 10,
-              background: 'var(--bg-tertiary)', color: 'var(--text-muted)',
-              border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
-            }}
-          >
-            清除
+          <input type="number" placeholder="%" min={0} max={99}
+            value={slCustom} onChange={e => setSlCustom(e.target.value)}
+            onBlur={() => { if (slCustom) applySL(parseFloat(slCustom)) }}
+            style={{ width: 44, padding: '2px 4px', fontSize: 10, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 2, outline: 'none', fontFamily: 'var(--font-mono)' }} />
+          <button onClick={() => { setStopLoss(''); setTakeProfit(''); setSlCustom(''); setTpCustom('') }}
+            style={{ padding: '2px 6px', fontSize: 10, background: 'transparent', color: 'var(--text-muted)', border: 'none', borderRadius: 2, cursor: 'pointer' }}>
+            ✕
           </button>
         </div>
-        {stopLoss && buyPrice > 0 && (
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            ≈ ${parseFloat(stopLoss).toFixed(precision)} ({((parseFloat(stopLoss) / buyPrice - 1) * 100).toFixed(1)}%)
-          </div>
-        )}
-      </div>
-
-      {/* ═══ 止盈 (TP) 快速设置 ═══ */}
-      <div className="field" style={{ gridColumn: '1 / -1' }}>
-        <label>止盈 TP</label>
-        <input
-          type="number" step={0.01}
-          value={takeProfit} onChange={e => setTakeProfit(e.target.value)}
-          placeholder="手动输入价格"
-          style={{ marginBottom: 4 }}
-        />
-        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <span style={{ fontSize: 10, color: 'var(--text-secondary)', minWidth: 24 }}>TP</span>
           {TP_MULTS.map(m => (
-            <button
-              key={m}
-              onClick={() => applyTP(m)}
-              style={{
-                flex: 1, minWidth: 40, padding: '3px 2px', fontSize: 10,
-                background: 'var(--bg-tertiary)', color: 'var(--green)',
-                border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer',
-                fontFamily: 'var(--font-mono)',
-              }}
-            >
+            <button key={m} onClick={() => applyTP(m)} className={takeProfit ? 'active' : ''}
+              style={{ flex: 1, padding: '2px 0', fontSize: 10, background: 'var(--bg-tertiary)', color: 'var(--green)', border: '1px solid var(--border)', borderRadius: 2, cursor: 'pointer', fontFamily: 'var(--font-mono)' }}>
               {m}x
             </button>
           ))}
+          <input type="number" placeholder="x" min={0} max={99} step={0.1}
+            value={tpCustom} onChange={e => setTpCustom(e.target.value)}
+            onBlur={() => { if (tpCustom) applyTP(parseFloat(tpCustom)) }}
+            style={{ width: 44, padding: '2px 4px', fontSize: 10, background: 'var(--bg-primary)', color: 'var(--text-primary)', border: '1px solid var(--border)', borderRadius: 2, outline: 'none', fontFamily: 'var(--font-mono)' }} />
         </div>
-        {takeProfit && buyPrice > 0 && (
-          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>
-            ≈ ${parseFloat(takeProfit).toFixed(precision)} ({((parseFloat(takeProfit) / buyPrice - 1) * 100).toFixed(1)}%)
+        {(stopLoss || takeProfit) && buyPrice > 0 && (
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 1 }}>
+            SL ${parseFloat(stopLoss || '0').toFixed(precision)} · TP ${parseFloat(takeProfit || '0').toFixed(precision)}
           </div>
         )}
       </div>
 
-      <div className="field">
-        <label>杠杆</label>
-        <span className="font-mono">1:{account?.leverage || 100}</span>
-      </div>
-
-      {/* 买卖按钮 */}
-      <div className="action-btns">
-        <button className="btn-buy" onClick={() => handleSubmit('buy')}>
-          买入 / 做多 {buyPrice > 0 ? `$${buyPrice.toFixed(precision)}` : ''}
+      {/* 买卖按钮 (prominent, always visible) */}
+      <div className="action-btns" style={{ gridColumn: '1 / -1', marginTop: 0 }}>
+        <button className="btn-buy" onClick={() => handleSubmit('buy')}
+          style={{ padding: '10px 0', fontSize: 15, fontWeight: 700 }}>
+          ▲ 买入 {buyPrice > 0 ? `$${buyPrice.toFixed(precision)}` : ''}
         </button>
-        <button className="btn-sell" onClick={() => handleSubmit('sell')}>
-          卖出 / 做空 {sellPrice > 0 ? `$${sellPrice.toFixed(precision)}` : ''}
+        <button className="btn-sell" onClick={() => handleSubmit('sell')}
+          style={{ padding: '10px 0', fontSize: 15, fontWeight: 700 }}>
+          ▼ 卖出 {sellPrice > 0 ? `$${sellPrice.toFixed(precision)}` : ''}
         </button>
       </div>
     </div>

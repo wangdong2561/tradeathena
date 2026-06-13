@@ -75,6 +75,14 @@ async def get_symbols(app=Depends(get_app_state)):
     return {"symbols": app.all_ticks() or [{"symbol": s, "bid": 0, "ask": 0, "last": 0, "change_24h": 0} for s in app.config.default_symbols]}
 
 
+@router.get("/news")
+async def get_news():
+    """Get top financial news from free RSS feeds."""
+    from ..services.news import get_news as fetch_news
+    news = await fetch_news()
+    return {"news": news}
+
+
 @router.get("/symbol-info/{symbol}")
 async def get_symbol_info(symbol: str):
     """Get trading hours and description for a symbol."""

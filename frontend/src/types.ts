@@ -41,6 +41,7 @@ export interface Position {
   stop_loss: number
   take_profit: number
   unrealized_pl: number
+  created_at?: number
 }
 
 export interface PendingOrder {

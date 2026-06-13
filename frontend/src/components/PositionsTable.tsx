@@ -4,7 +4,7 @@ import type { Position } from '../types'
 
 interface Props {
   positions: Position[]
-  onClose: (id: number, pos?: Position) => void
+  onClose: (id: number, pos?: Position, exitPrice?: number) => void
 }
 
 export const PositionsTable: React.FC<Props> = ({ positions, onClose }) => {
@@ -12,8 +12,8 @@ export const PositionsTable: React.FC<Props> = ({ positions, onClose }) => {
 
   const handleClose = async (id: number, pos?: Position) => {
     try {
-      await closePosition(id)
-      onClose(id, pos)
+      const r = await closePosition(id)
+      onClose(id, pos, r.exit_price)
     } catch (e: any) {
       alert('平仓失败: ' + e.message)
     }

@@ -11,6 +11,16 @@ echo "╔═══════════════════════�
 echo "║      TradeAthena 量化交易终端            ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
+
+# Check venv
+if [ ! -f ".venv/bin/uvicorn" ]; then
+    echo "❌ 未找到虚拟环境，请先运行:"
+    echo "   python3 -m venv .venv"
+    echo "   source .venv/bin/activate && pip install -r requirements.txt"
+    echo "   pip install maturin && maturin develop --release"
+    exit 1
+fi
+
 echo "🚀 启动后端 (端口 8000)..."
 .venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
 BACKEND_PID=$!
@@ -29,7 +39,18 @@ echo "  API 文档:  http://localhost:8000/docs"
 echo "  登录:      admin / admin123"
 echo "══════════════════════════════════════════"
 echo ""
-echo "按 Ctrl+C 停止所有服务"
+echo "  [Ctrl+C] 停止所有服务并退出"
+echo ""
 
-trap "kill $BACKEND_PID $FRONTEND_PID 2>/dev/null" EXIT
-wait
+cleanup() {
+    echo ""
+    echo "🛑 正在停止服务..."
+    kill $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
+    echo "✅ 服务已停止"
+    exit 0
+}
+
+trap cleanup SIGINT SIGTERM
+
+wait $BACKEND_PID $FRONTEND_PID 2>/dev/null
