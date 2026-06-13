@@ -1,3 +1,5 @@
+[![English](https://img.shields.io/badge/lang-English-blue.svg)](README.md)
+
 # TradeAthena 量化交易终端
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

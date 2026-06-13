@@ -1,3 +1,5 @@
+[![中文](https://img.shields.io/badge/lang-中文-red.svg)](README-zh.md)
+
 # TradeAthena — Quantitative Trading Terminal
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -144,7 +146,7 @@ tradeathena/
 │   └── package.json
 ├── Design.md                   # Design document
 ├── README.md                   # This file (English)
-├── README-cn.md                # Chinese documentation
+├── README-zh.md                # Chinese documentation
 ├── run.sh                      # Start script
 ├── Cargo.toml                  # Rust config
 ├── pyproject.toml              # Python build config
@@ -254,4 +256,4 @@ If this project helps you, consider buying the author a coffee ☕
 
 ---
 
-> [中文文档](README-cn.md)
+> [中文文档](README-zh.md)
