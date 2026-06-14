@@ -1,4 +1,4 @@
-"""Symbol information — trading hours, specs, descriptions (Eastern European Time)."""
+"""Symbol information — trading hours, specs, descriptions (Beijing Time CST UTC+8)."""
 
 SYMBOL_INFO = {
     "BTCUSDT": {
@@ -18,8 +18,8 @@ SYMBOL_INFO = {
         "full_name": "Gold / US Dollar",
         "type": "贵金属",
         "exchange": "COMEX",
-        "trading_hours": "周一 06:00 — 周六 05:00 (夏令时)\n周一 07:00 — 周六 06:00 (冬令时)",
-        "trading_hours_cn": "每日05:00-06:00休市(夏令时) / 06:00-07:00休市(冬令时)",
+        "trading_hours": "周一 11:00 — 周六 10:00 (夏令时)\n周一 13:00 — 周六 12:00 (冬令时)",
+        "trading_hours_cn": "每日10:00-11:00休市(夏令时) / 12:00-13:00休市(冬令时)",
         "leverage_max": 50,
         "lot_min": 0.01,
         "lot_step": 0.01,
@@ -30,8 +30,8 @@ SYMBOL_INFO = {
         "full_name": "Silver / US Dollar",
         "type": "贵金属",
         "exchange": "COMEX",
-        "trading_hours": "周一 06:00 — 周六 05:00 (夏令时)\n周一 07:00 — 周六 06:00 (冬令时)",
-        "trading_hours_cn": "每日05:00-06:00休市(夏令时) / 06:00-07:00休市(冬令时)",
+        "trading_hours": "周一 11:00 — 周六 10:00 (夏令时)\n周一 13:00 — 周六 12:00 (冬令时)",
+        "trading_hours_cn": "每日10:00-11:00休市(夏令时) / 12:00-13:00休市(冬令时)",
         "leverage_max": 50,
         "lot_min": 0.01,
         "lot_step": 0.01,

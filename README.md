@@ -217,15 +217,15 @@ Signals appear as arrows on the chart. Open the **Strategy** tab in the terminal
 
 ---
 
-## Trading Hours (EET)
+## Trading Hours (Beijing Time CST UTC+8)
 
-> System time is Eastern European Time (EET). DST (Mar-Oct): UTC+3, Winter: UTC+2.
+> All times are Beijing Time (CST, UTC+8).
 
 | Symbol | Exchange | Trading Hours | Break |
 |:---|:---|:---|:---|
-| **BTC/USDT** | Binance | 🟢 24h × 7d | None |
-| **XAU/USD** | COMEX | 🟡 Mon 06:00→Sat 05:00 (DST) | Daily 05:00-06:00 |
-| **XAG/USD** | COMEX | 🟡 Mon 06:00→Sat 05:00 (DST) | Daily 05:00-06:00 |
+| **BTC/USDT** | Binance/OKX | 🟢 24h × 7d | None |
+| **XAU/USD** | COMEX | 🟡 Mon 11:00→Sat 10:00 (DST) | Daily 10:00-11:00 |
+| **XAG/USD** | COMEX | 🟡 Mon 11:00→Sat 10:00 (DST) | Daily 10:00-11:00 |
 
 ---
 
