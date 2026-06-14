@@ -17,5 +17,8 @@ frontend/dist/
 .vscode/
 *.swp
 
+# Environment (local secrets, never commit)
+.env
+
 # OS
 .DS_Store
