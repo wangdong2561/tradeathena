@@ -9,6 +9,19 @@ from sqlalchemy import select
 from .database import Base
 
 
+class User(Base):
+    """User account — supports multi-user, per-user balance in DB."""
+
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False, index=True)
+    password_hash = Column(String, nullable=False)
+    balance = Column(Float, default=10000.0)
+    role = Column(String, default="user")  # 'admin' | 'user'
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class OrderHistory(Base):
     """Historical record of completed/cancelled orders."""
 

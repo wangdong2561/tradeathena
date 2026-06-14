@@ -98,6 +98,10 @@ class MarketSimulator:
     def on_ticker(self, cb: Callable):
         self._callbacks.append(cb)
 
+    def on_kline(self, cb: Callable):
+        """Kline callback registration — no-op for simulator mode (no real klines)."""
+        pass  # klines are generated on-demand via SimulatedBinanceClient.get_klines()
+
     def get_tick(self, symbol: str) -> Optional[CachedTick]:
         return self._ticks.get(symbol.upper())
 

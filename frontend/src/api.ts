@@ -1,22 +1,31 @@
-import type { Ticker, Kline, Account, Position, PendingOrder, TradeResult, TradeHistory } from './types'
+import type { Ticker, Kline, Account, Position, PendingOrder, TradeResult, TradeHistory, User } from './types'
 
 const BASE = '/api/v1'
 
-async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`)
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem('ta_token')
+  return token ? { 'Authorization': `Bearer ${token}` } : {}
+}
+
+async function get<T>(path: string, auth = false): Promise<T> {
+  const headers: Record<string, string> = auth ? authHeaders() : {}
+  const res = await fetch(`${BASE}${path}`, { headers })
+  if (res.status === 401) { localStorage.removeItem('ta_token'); localStorage.removeItem('ta_user'); window.location.reload() }
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()
 }
 
-async function post<T>(path: string, body?: unknown): Promise<T> {
+async function post<T>(path: string, body?: unknown, auth = false): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(auth ? authHeaders() : {}) }
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
+  if (res.status === 401) { localStorage.removeItem('ta_token'); localStorage.removeItem('ta_user'); window.location.reload() }
   if (!res.ok) {
     const detail = await res.text().catch(() => '')
-    throw new Error(`API error ${res.status}: ${detail.slice(0, 200)}`)
+    throw new Error(detail.slice(0, 200) || `API error ${res.status}`)
   }
   return res.json()
 }
@@ -27,12 +36,14 @@ async function del<T>(path: string): Promise<T> {
   return res.json()
 }
 
-async function put<T>(path: string, body: unknown): Promise<T> {
+async function put<T>(path: string, body: unknown, auth = false): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(auth ? authHeaders() : {}) }
   const res = await fetch(`${BASE}${path}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify(body),
   })
+  if (res.status === 401) { localStorage.removeItem('ta_token'); localStorage.removeItem('ta_user'); window.location.reload() }
   if (!res.ok) throw new Error(`API error: ${res.status} ${res.statusText}`)
   return res.json()
 }
@@ -122,4 +133,32 @@ export async function resetAccount(): Promise<{ success: boolean; account: Accou
 
 export async function getHistory(page = 1, pageSize = 50): Promise<{ trades: TradeHistory[]; total: number }> {
   return get(`/account/history?page=${page}&page_size=${pageSize}`)
+}
+
+// ── Auth ───────────────────────────────────────────────
+
+export async function login(username: string, password: string): Promise<{ token: string; user: User }> {
+  return post('/auth/login', { username, password })
+}
+
+export async function register(username: string, password: string): Promise<User> {
+  return post('/auth/register', { username, password })
+}
+
+export async function fetchMe(): Promise<User> {
+  return get('/auth/me', true)
+}
+
+export async function reloadEngine(): Promise<{ success: boolean; balance: number }> {
+  return post('/auth/reload', undefined, true)
+}
+
+// ── Admin ──────────────────────────────────────────────
+
+export async function fetchUsers(): Promise<{ users: User[] & { created_at?: string }[] }> {
+  return get('/admin/users', true)
+}
+
+export async function updateUserBalance(userId: number, balance: number): Promise<{ success: boolean; balance: number }> {
+  return put(`/admin/users/${userId}/balance`, { balance }, true)
 }

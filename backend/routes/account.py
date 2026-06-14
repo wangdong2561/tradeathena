@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 
 from ..app_state import get_app_state
 from ..database import async_session
-from ..models import TradeHistory
+from ..models import TradeHistory, User
 
 router = APIRouter()
 
@@ -62,6 +62,15 @@ async def get_history(
 @router.post("/reset")
 async def reset_account(app=Depends(get_app_state)):
     """Reset account to initial balance (clears all positions and orders)."""
+    # Reset engine balance
     app.engine.reset(app.config.default_balance)
+    # Persist to DB for active user
+    active_id = getattr(app, "active_user_id", None)
+    if active_id:
+        async with async_session() as session:
+            user = await session.get(User, active_id)
+            if user:
+                user.balance = app.config.default_balance
+                await session.commit()
     acc = app.engine.get_account()
     return {"success": True, "account": acc}

@@ -3,9 +3,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from sqlalchemy import select
+
 from ..app_state import get_app_state
 from ..database import async_session
-from ..models import OrderHistory
+from ..models import OrderHistory, User
 
 router = APIRouter()
 
@@ -58,6 +60,17 @@ async def place_order(req: PlaceOrderRequest, app=Depends(get_app_state)):
                 take_profit=req.take_profit if req.take_profit > 0 else None,
             ))
             await session.commit()
+
+    # Persist balance to DB if a real trade happened
+    if result.get("filled"):
+        active_id = getattr(app, "active_user_id", None)
+        if active_id:
+            engine_balance = app.engine.get_account().get("balance", 0)
+            async with async_session() as session:
+                user = await session.get(User, active_id)
+                if user:
+                    user.balance = engine_balance
+                    await session.commit()
 
     # Broadcast
     await app.ws_manager.broadcast_order_update(result)

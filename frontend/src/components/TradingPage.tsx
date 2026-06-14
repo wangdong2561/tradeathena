@@ -1,9 +1,11 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
-import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, subscribeKline, fetchNews } from '../api'
+import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, subscribeKline, fetchNews, reloadEngine } from '../api'
 import { wsClient } from '../websocket'
-import type { Ticker, Account, Kline, Position, PendingOrder, TradeResult, TradeMarker } from '../types'
+import type { Ticker, Account, Kline, Position, PendingOrder, TradeResult, TradeMarker, User } from '../types'
+import { StrategyPanel, signalToMarker } from './StrategyPanel'
+import { DEFAULT_STRATEGY_CONFIG, type StrategyConfig, type StrategySignal } from '../utils/strategy'
 
 import { TopBar } from './TopBar'
 import { MarketWatch } from './MarketWatch'
@@ -15,9 +17,14 @@ import { HistoryTable } from './HistoryTable'
 
 import '../styles.css'
 
-type Tab = 'trade' | 'positions' | 'orders' | 'history'
+type Tab = 'trade' | 'positions' | 'orders' | 'history' | 'strategy'
 
-export const TradingPage: React.FC = () => {
+interface Props {
+  user: User
+  onLogout: () => void
+}
+
+export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
   // Clocks: UTC in marketwatch, Beijing in statusbar
   const [utcClock, setUtcClock] = useState('')
   const [bjClock, setBjClock] = useState('')
@@ -64,6 +71,11 @@ export const TradingPage: React.FC = () => {
   const [newsItems, setNewsItems] = useState<{title:string;summary:string;url:string;source:string;sentiment:number}[]>([])
   const markerId = useRef(0)
 
+  // Strategy state
+  const [strategyConfig, setStrategyConfig] = useState<StrategyConfig>(DEFAULT_STRATEGY_CONFIG)
+  const lastSignalType = useRef<'buy' | 'sell' | null>(null)
+  const [strategyMarkers, setStrategyMarkers] = useState<TradeMarker[]>([])
+
   const selectedRef = useRef(selectedSymbol)
   const timeframeRef = useRef(timeframe)
   selectedRef.current = selectedSymbol
@@ -76,6 +88,8 @@ export const TradingPage: React.FC = () => {
   // ── Initial Data Load ──────────────────────────────────
 
   useEffect(() => {
+    // Re-init engine with stored user's balance (handles page refresh / server restart)
+    reloadEngine().catch(() => {})
     fetchSymbols().then(data => {
       if (data.length > 0) setSymbols(data.map(t => t.symbol))
       const tickMap: Record<string, Ticker> = {}
@@ -256,6 +270,8 @@ export const TradingPage: React.FC = () => {
         selectedSymbol={selectedSymbol}
         onSymbolChange={setSelectedSymbol}
         account={account}
+        user={user}
+        onLogout={onLogout}
       />
 
       <PanelGroup direction="vertical" autoSaveId="main5" style={{ flex: 1, minHeight: 0 }}>
@@ -272,7 +288,8 @@ export const TradingPage: React.FC = () => {
                   <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 600, marginLeft: 4 }}>1m 波动</span>
                 </div>
                 <div style={{ flex: 1, minHeight: 0 }}>
-                  <TradingChart key={selectedSymbol + timeframe} data={klineData} symbol={selectedSymbol} tradeMarkers={tradeMarkers} bid={currentTicker?.bid} ask={currentTicker?.ask} />
+                  <TradingChart key={selectedSymbol + timeframe} data={klineData} symbol={selectedSymbol}
+                    tradeMarkers={[...tradeMarkers, ...strategyMarkers]} bid={currentTicker?.bid} ask={currentTicker?.ask} />
                 </div>
                 <div style={{ height: 80, padding: '4px 10px', background: 'var(--bg-primary)', borderTop: '1px solid var(--border)', fontSize: 10, color: 'var(--text-muted)', flexShrink: 0, overflowY: 'auto' }}>
                   <div style={{ fontWeight: 600, fontSize: 9, color: 'var(--text-secondary)', marginBottom: 2, textTransform: 'uppercase', letterSpacing: '0.5px' }}>实时盈亏</div>
@@ -349,6 +366,7 @@ export const TradingPage: React.FC = () => {
                 挂单 {pendingOrders.length > 0 ? `(${pendingOrders.length})` : ''}
               </button>
               <button className={terminalTab === 'history' ? 'active' : ''} onClick={() => setTerminalTab('history')}>历史</button>
+              <button className={terminalTab === 'strategy' ? 'active' : ''} onClick={() => setTerminalTab('strategy')}>策略</button>
             </div>
             <div className="terminal-content">
               {terminalTab === 'trade' && (
@@ -367,6 +385,20 @@ export const TradingPage: React.FC = () => {
                 }} />
               )}
               {terminalTab === 'history' && <HistoryTable />}
+              {terminalTab === 'strategy' && (
+                <StrategyPanel
+                  klineData={klineData}
+                  config={strategyConfig}
+                  onConfigChange={setStrategyConfig}
+                  lastSignalType={lastSignalType.current}
+                  onNewSignal={(sig) => {
+                    lastSignalType.current = sig.type
+                    setStrategyMarkers(prev => [...prev, signalToMarker(sig)])
+                    // Auto-switch to strategy tab briefly to show the signal
+                    setTerminalTab('strategy')
+                  }}
+                />
+              )}
             </div>
           </div>
         </Panel>

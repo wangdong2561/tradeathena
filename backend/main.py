@@ -10,6 +10,8 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
+
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -76,9 +78,8 @@ def _enrich_account(state) -> dict:
 
 async def _check_connectivity() -> bool:
     """Check if Binance API is reachable."""
-    import httpx
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), verify=False) as client:
             resp = await client.get("https://api.binance.com/api/v3/ping")
             return resp.status_code == 200
     except Exception:
@@ -96,7 +97,7 @@ async def lifespan(app: FastAPI):
     state.engine = _create_engine()
     state.app = app
 
-    # Detect network mode
+    # Detect network mode — Binance or Simulator
     online = await _check_connectivity()
     logger.info("Network check: %s", "ONLINE (Binance)" if online else "OFFLINE (Simulator)")
 
@@ -181,8 +182,7 @@ async def lifespan(app: FastAPI):
         await state.gold_client.start()
 
     app.state.app_state = state
-    mode = "BINANCE" if online else "SIMULATOR"
-    logger.info("═══ TradeAthena ready [%s] ═══", mode)
+    logger.info("═══ TradeAthena ready [%s] ═══", "BINANCE" if online else "SIMULATOR")
     yield
 
     await state.market_service.stop()
@@ -200,11 +200,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routes import market, orders, account, positions
+from .routes import market, orders, account, positions, auth, admin
 app.include_router(market.router, prefix="/api/v1/market", tags=["market"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["orders"])
 app.include_router(account.router, prefix="/api/v1/account", tags=["account"])
 app.include_router(positions.router, prefix="/api/v1/positions", tags=["positions"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 
 # ── WebSocket ──────────────────────────────────────────

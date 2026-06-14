@@ -1,5 +1,5 @@
 #!/bin/bash
-# TradeAthena — 一键启动
+# TradeAthena — 一键启动 (with port cleanup)
 # Usage: bash run.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -12,7 +12,27 @@ echo "║      TradeAthena 量化交易终端            ║"
 echo "╚══════════════════════════════════════════╝"
 echo ""
 
-# Check venv
+# ── Port cleanup ──────────────────────────────────────
+clean_port() {
+  local port=$1
+  local pid
+  pid=$(lsof -ti tcp:"$port" 2>/dev/null)
+  if [ -n "$pid" ]; then
+    echo "🔧 端口 $port 已被占用 (PID $pid)，正在释放..."
+    kill "$pid" 2>/dev/null
+    sleep 1
+    # Force kill if still alive
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null
+    fi
+    echo "   端口 $port 已释放"
+  fi
+}
+
+clean_port 8000  # 后端
+clean_port 5173  # 前端
+
+# ── Check venv ────────────────────────────────────────
 if [ ! -f ".venv/bin/uvicorn" ]; then
     echo "❌ 未找到虚拟环境，请先运行:"
     echo "   python3 -m venv .venv"

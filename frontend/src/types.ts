@@ -80,6 +80,13 @@ export interface TradeHistory {
   close_time: string
 }
 
+export interface User {
+  id: number
+  username: string
+  balance: number
+  role: 'admin' | 'user'
+}
+
 export type OrderSide = 'buy' | 'sell'
 export type OrderType = 'market' | 'limit' | 'stop'
 

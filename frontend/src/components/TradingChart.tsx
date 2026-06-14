@@ -6,7 +6,7 @@ import {
   type PriceLineOptions,
 } from 'lightweight-charts'
 import type { Kline, TradeMarker } from '../types'
-import { calcEMA, calcRSI } from '../utils/indicators'
+import { calcEMA, calcRSI, calcBollingerBands } from '../utils/indicators'
 
 interface Props {
   data: Kline[]
@@ -39,6 +39,10 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const ema20Series = useRef<ISeriesApi<'Line'> | null>(null)
   const ema50Series = useRef<ISeriesApi<'Line'> | null>(null)
   const rsiSeries = useRef<ISeriesApi<'Line'> | null>(null)
+  const bbUpperSeries = useRef<ISeriesApi<'Line'> | null>(null)
+  const bbMiddleSeries = useRef<ISeriesApi<'Line'> | null>(null)
+  const bbLowerSeries = useRef<ISeriesApi<'Line'> | null>(null)
+  const ema200Series = useRef<ISeriesApi<'Line'> | null>(null)
   const observerRef = useRef<ResizeObserver | null>(null)
   const [activeTool, setActiveTool] = useState<Tool>('crosshair')
   const activeToolRef = useRef(activeTool)
@@ -47,6 +51,8 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const [horizLines, setHorizLines] = useState<{price: number; color: string}[]>([])
   const [showEMA, setShowEMA] = useState(true)
   const [showRSI, setShowRSI] = useState(true)
+  const [showBB, setShowBB] = useState(true)
+  const [showEMA200, setShowEMA200] = useState(true)
   const [crossPoints, setCrossPoints] = useState<{symbol:string;time:any;ema20:number;ema50:number;type:'golden'|'death'}[]>([])
   const isFirstData = useRef(true)
   const crosshairPrice = useRef(0)
@@ -78,6 +84,16 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const rsiData = useMemo(() => {
     if (data.length < 15) return []
     return calcRSI(data, 14)
+  }, [data])
+
+  const bbData = useMemo(() => {
+    if (data.length < 20) return { upper: [], middle: [], lower: [] }
+    return calcBollingerBands(data, 20, 2)
+  }, [data])
+
+  const ema200Data = useMemo(() => {
+    if (data.length < 200) return []
+    return calcEMA(data, 200)
   }, [data])
 
   const precision = symbol.includes('USDT') || symbol === 'XAUUSD' ? 2 : 4
@@ -155,11 +171,45 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
         crosshairMarkerVisible: false,
       })
 
+      // Bollinger Bands — upper
+      const bbu = chart.addLineSeries({
+        color: 'rgba(38, 166, 154, 0.6)', lineWidth: 1, lineStyle: 2,
+        priceScaleId: 'right',
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      // Bollinger Bands — middle (SMA)
+      const bbm = chart.addLineSeries({
+        color: 'rgba(38, 166, 154, 0.8)', lineWidth: 1,
+        priceScaleId: 'right',
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+      // Bollinger Bands — lower
+      const bbl = chart.addLineSeries({
+        color: 'rgba(38, 166, 154, 0.6)', lineWidth: 1, lineStyle: 2,
+        priceScaleId: 'right',
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+
+      // 200 EMA
+      const e200 = chart.addLineSeries({
+        color: '#ff6f00', lineWidth: 1, lineStyle: 3,
+        priceScaleId: 'right',
+        lastValueVisible: false, priceLineVisible: false,
+        crosshairMarkerVisible: false,
+      })
+
       chartRef.current = chart
       candleSeries.current = candles
       volumeSeries.current = volume
       ema20Series.current = e20
       ema50Series.current = e50
+      bbUpperSeries.current = bbu
+      bbMiddleSeries.current = bbm
+      bbLowerSeries.current = bbl
+      ema200Series.current = e200
 
       // Track crosshair price
       chart.subscribeCrosshairMove(param => {
@@ -206,6 +256,10 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       volumeSeries.current = null
       ema20Series.current = null
       ema50Series.current = null
+      bbUpperSeries.current = null
+      bbMiddleSeries.current = null
+      bbLowerSeries.current = null
+      ema200Series.current = null
     }
   }, [])
 
@@ -328,6 +382,47 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       }))]
     })
   }, [data, ema20Data, ema50Data, showEMA])
+
+  // ── Update Bollinger Bands ──────────────────────────
+
+  useEffect(() => {
+    if (!bbUpperSeries.current || !bbMiddleSeries.current || !bbLowerSeries.current) return
+    if (data.length < 20 || bbData.upper.length === 0) return
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    const t = (i: number) => sorted[i].time as any
+
+    const upper: LineData[] = []
+    const middle: LineData[] = []
+    const lower: LineData[] = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (bbData.upper[i] !== null) {
+        upper.push({ time: t(i), value: bbData.upper[i]! })
+        middle.push({ time: t(i), value: bbData.middle[i]! })
+        lower.push({ time: t(i), value: bbData.lower[i]! })
+      }
+    }
+    sd(bbUpperSeries.current, upper)
+    sd(bbMiddleSeries.current, middle)
+    sd(bbLowerSeries.current, lower)
+    bbUpperSeries.current.applyOptions({ visible: showBB })
+    bbMiddleSeries.current.applyOptions({ visible: showBB })
+    bbLowerSeries.current.applyOptions({ visible: showBB })
+  }, [data, bbData, showBB])
+
+  // ── Update 200 EMA ──────────────────────────────────
+
+  useEffect(() => {
+    if (!ema200Series.current || data.length < 200) return
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    const t = (i: number) => sorted[i].time as any
+
+    const line: LineData[] = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (ema200Data[i] !== null) line.push({ time: t(i), value: ema200Data[i]! })
+    }
+    sd(ema200Series.current, line)
+    ema200Series.current.applyOptions({ visible: showEMA200 })
+  }, [data, ema200Data, showEMA200])
 
   // ── RSI pane ─────────────────────────────────────────
 
@@ -467,6 +562,8 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
         <span className="separator" />
         <button className={showEMA ? 'active' : ''} onClick={() => setShowEMA(!showEMA)}>EMA</button>
         <button className={showRSI ? 'active' : ''} onClick={() => setShowRSI(!showRSI)}>RSI</button>
+        <button className={showBB ? 'active' : ''} onClick={() => setShowBB(!showBB)}>BB</button>
+        <button className={showEMA200 ? 'active' : ''} onClick={() => setShowEMA200(!showEMA200)}>EMA200</button>
         <button onClick={() => setThemeIdx((themeIdx + 1) % COLOR_THEMES.length)} title={COLOR_THEMES[(themeIdx + 1) % COLOR_THEMES.length][4]}>
           配色 <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: colors[0], marginLeft: 2 }} />
         </button>
@@ -513,6 +610,16 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
                   }
                 </span>
               )}
+            </span>
+          )}
+          {showBB && (
+            <span style={{ marginRight: 10 }}>
+              <span style={{ color: 'rgba(38,166,154,0.8)' }}>━</span> BB(20,2)
+            </span>
+          )}
+          {showEMA200 && (
+            <span style={{ marginRight: 10 }}>
+              <span style={{ color: '#ff6f00' }}>┅</span> EMA200
             </span>
           )}
           {symbol.replace('USDT', '/USDT').replace('XAUUSD', 'XAU/USD').replace('XAGUSD', 'XAG/USD')}

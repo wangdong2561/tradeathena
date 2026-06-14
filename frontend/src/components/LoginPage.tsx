@@ -1,27 +1,53 @@
 import React, { useState } from 'react'
-
-const DEFAULT_USER = 'admin'
-const DEFAULT_PASS = 'admin123'
+import { login, register } from '../api'
+import type { User } from '../types'
 
 interface Props {
-  onLogin: () => void
+  onLogin: (user: User, token: string) => void
 }
 
 export const LoginPage: React.FC<Props> = ({ onLogin }) => {
+  const [mode, setMode] = useState<'login' | 'register'>('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
+
     if (!username.trim() || !password.trim()) {
       setError('请输入用户名和密码')
       return
     }
-    if (username === DEFAULT_USER && password === DEFAULT_PASS) {
-      onLogin()
-    } else {
-      setError('用户名或密码错误')
+
+    if (mode === 'register' && password !== confirm) {
+      setError('两次密码输入不一致')
+      return
+    }
+
+    setLoading(true)
+    try {
+      if (mode === 'login') {
+        const result = await login(username.trim(), password)
+        onLogin(result.user, result.token)
+      } else {
+        await register(username.trim(), password)
+        // Switch to login after successful register
+        setMode('login')
+        setError('注册成功，请登录')
+      }
+    } catch (err: any) {
+      try {
+        const msg = JSON.parse(err.message)
+        setError(msg.detail || '操作失败')
+      } catch {
+        setError(err.message || '操作失败')
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -44,8 +70,32 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             TradeAthena
           </div>
           <div style={{ fontSize: 12, color: '#5a5f69' }}>
-            量化交易终端 v0.1.0
+            量化交易终端
           </div>
+        </div>
+
+        {/* Mode Tabs */}
+        <div style={{ display: 'flex', marginBottom: 20, gap: 0 }}>
+          <button onClick={() => { setMode('login'); setError('') }}
+            style={{
+              flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 600,
+              background: mode === 'login' ? '#1a1d24' : 'transparent',
+              color: mode === 'login' ? '#d1d4dc' : '#5a5f69',
+              border: '1px solid', borderColor: mode === 'login' ? '#2962ff' : '#2a2e38',
+              borderRadius: '4px 0 0 4px', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            登录
+          </button>
+          <button onClick={() => { setMode('register'); setError('') }}
+            style={{
+              flex: 1, padding: '8px 0', fontSize: 13, fontWeight: 600,
+              background: mode === 'register' ? '#1a1d24' : 'transparent',
+              color: mode === 'register' ? '#d1d4dc' : '#5a5f69',
+              border: '1px solid', borderColor: mode === 'register' ? '#2962ff' : '#2a2e38',
+              borderRadius: '0 4px 4px 0', cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+            注册
+          </button>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -56,7 +106,7 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             <input
               value={username}
               onChange={e => { setUsername(e.target.value); setError('') }}
-              placeholder="admin"
+              placeholder={mode === 'login' ? 'admin' : '至少2个字符'}
               style={{
                 width: '100%', padding: '8px 10px', fontSize: 13,
                 background: '#1a1d24', color: '#d1d4dc',
@@ -69,7 +119,7 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             />
           </div>
 
-          <div style={{ marginBottom: 20 }}>
+          <div style={{ marginBottom: mode === 'register' ? 14 : 20 }}>
             <label style={{ display: 'block', fontSize: 11, color: '#8a8f99', marginBottom: 4 }}>
               密码
             </label>
@@ -77,7 +127,7 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
               type="password"
               value={password}
               onChange={e => { setPassword(e.target.value); setError('') }}
-              placeholder="admin123"
+              placeholder={mode === 'login' ? 'admin123' : '至少4个字符'}
               style={{
                 width: '100%', padding: '8px 10px', fontSize: 13,
                 background: '#1a1d24', color: '#d1d4dc',
@@ -89,10 +139,34 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
             />
           </div>
 
+          {mode === 'register' && (
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ display: 'block', fontSize: 11, color: '#8a8f99', marginBottom: 4 }}>
+                确认密码
+              </label>
+              <input
+                type="password"
+                value={confirm}
+                onChange={e => { setConfirm(e.target.value); setError('') }}
+                placeholder="再次输入密码"
+                style={{
+                  width: '100%', padding: '8px 10px', fontSize: 13,
+                  background: '#1a1d24', color: '#d1d4dc',
+                  border: '1px solid #2a2e38', borderRadius: 4, outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+                onFocus={e => e.target.style.borderColor = '#2962ff'}
+                onBlur={e => e.target.style.borderColor = '#2a2e38'}
+              />
+            </div>
+          )}
+
           {error && (
             <div style={{
-              color: '#f24453', fontSize: 12, marginBottom: 12,
-              padding: '6px 10px', background: 'rgba(242,68,83,0.1)',
+              color: error.includes('成功') ? '#4caf50' : '#f24453',
+              fontSize: 12, marginBottom: 12,
+              padding: '6px 10px',
+              background: error.includes('成功') ? 'rgba(76,175,80,0.1)' : 'rgba(242,68,83,0.1)',
               borderRadius: 4,
             }}>
               {error}
@@ -101,19 +175,17 @@ export const LoginPage: React.FC<Props> = ({ onLogin }) => {
 
           <button
             type="submit"
+            disabled={loading}
             style={{
               width: '100%', padding: '10px 0', fontSize: 14, fontWeight: 600,
-              background: '#2962ff', color: '#fff', border: 'none', borderRadius: 4,
-              cursor: 'pointer', fontFamily: 'inherit',
+              background: loading ? '#1a3a8a' : '#2962ff', color: '#fff',
+              border: 'none', borderRadius: 4,
+              cursor: loading ? 'not-allowed' : 'pointer', fontFamily: 'inherit',
             }}
           >
-            登录
+            {loading ? '请稍候...' : (mode === 'login' ? '登录' : '注册')}
           </button>
         </form>
-
-        <div style={{ marginTop: 20, fontSize: 11, color: '#5a5f69', textAlign: 'center' }}>
-          默认账户: admin / admin123
-        </div>
       </div>
     </div>
   )

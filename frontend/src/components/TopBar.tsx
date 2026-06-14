@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react'
-import type { Account } from '../types'
+import type { Account, User } from '../types'
+import { AdminPanel } from './AdminPanel'
 
 interface Props {
   symbols: string[]
   selectedSymbol: string
   onSymbolChange: (s: string) => void
   account: Account | null
+  user: User
+  onLogout: () => void
 }
 
 interface SymbolInfo {
@@ -15,10 +18,11 @@ interface SymbolInfo {
 }
 
 export const TopBar: React.FC<Props> = ({
-  symbols, selectedSymbol, onSymbolChange, account,
+  symbols, selectedSymbol, onSymbolChange, account, user, onLogout,
 }) => {
   const [info, setInfo] = useState<SymbolInfo | null>(null)
   const [showInfo, setShowInfo] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
   const infoRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -94,6 +98,24 @@ export const TopBar: React.FC<Props> = ({
           </div>
         </div>
       )}
+
+      <div className="user-area" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', paddingLeft: 12, borderLeft: '1px solid var(--border)' }}>
+        <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+          {user.username}{user.role === 'admin' ? ' 🔧' : ''}
+        </span>
+        {user.role === 'admin' && (
+          <button onClick={() => setShowAdmin(true)}
+            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--accent)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>
+            管理
+          </button>
+        )}
+        <button onClick={onLogout}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>
+          退出
+        </button>
+      </div>
+
+      {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>
   )
 }

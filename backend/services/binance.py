@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 import ssl
 from typing import Any, Callable, Optional
 
@@ -42,7 +43,7 @@ class BinanceClient:
             self._http = httpx.AsyncClient(
                 base_url=self.REST_URL,
                 timeout=httpx.Timeout(10.0),
-                verify=False,  # allow proxy SSL interception
+                verify=False,
             )
         return self._http
 

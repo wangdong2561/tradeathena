@@ -1,6 +1,47 @@
 /** Technical indicator calculations. */
 import type { Kline } from '../types'
 
+/** Simple Moving Average */
+export function calcSMA(data: Kline[], period: number): (number | null)[] {
+  const result: (number | null)[] = []
+  for (let i = 0; i < data.length; i++) {
+    if (i < period - 1) { result.push(null); continue }
+    let sum = 0
+    for (let j = 0; j < period; j++) sum += data[i - j].close
+    result.push(sum / period)
+  }
+  return result
+}
+
+/** Bollinger Bands (20, 2 by default) */
+export function calcBollingerBands(
+  data: Kline[], period = 20, stdDev = 2,
+): { middle: (number | null)[]; upper: (number | null)[]; lower: (number | null)[] } {
+  const sma = calcSMA(data, period)
+  const middle: (number | null)[] = []
+  const upper: (number | null)[] = []
+  const lower: (number | null)[] = []
+
+  for (let i = 0; i < data.length; i++) {
+    const m = sma[i]
+    if (m === null) {
+      middle.push(null); upper.push(null); lower.push(null)
+      continue
+    }
+    // Population standard deviation
+    let sumSq = 0
+    for (let j = 0; j < period; j++) {
+      const diff = data[i - j].close - m
+      sumSq += diff * diff
+    }
+    const sd = Math.sqrt(sumSq / period)
+    middle.push(m)
+    upper.push(m + sd * stdDev)
+    lower.push(m - sd * stdDev)
+  }
+  return { middle, upper, lower }
+}
+
 /** Exponential Moving Average */
 export function calcEMA(data: Kline[], period: number): (number | null)[] {
   const k = 2 / (period + 1)
