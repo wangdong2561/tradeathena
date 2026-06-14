@@ -110,11 +110,11 @@ npm run dev
 
 | Symbol | Source | Type | Update Frequency |
 |:---|:---|:---|:---|
-| **BTC/USDT** | Binance WebSocket | Real-time push | ~100ms |
-| **XAU/USD** Gold | gold-api.com REST | Real price | Every 5 min + micro-drift |
-| **XAG/USD** Silver | gold-api.com REST | Real price | Every 5 min + micro-drift |
+| **BTC/USDT** | OKX WebSocket | Real-time push | ~100ms |
+| **XAU/USD** Gold | gold-api.com REST | Real price | Every 5 min |
+| **XAG/USD** Silver | gold-api.com REST | Real price | Every 5 min |
 
-> Gold and silver prices include slight random walks between API refreshes to maintain a live feel.
+> Gold and silver prices update only on API refresh — no simulated drift, static during market close.
 
 ---
 
