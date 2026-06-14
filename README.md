@@ -111,10 +111,10 @@ npm run dev
 | Symbol | Source | Type | Update Frequency |
 |:---|:---|:---|:---|
 | **BTC/USDT** | OKX WebSocket | Real-time push | ~100ms |
-| **XAU/USD** Gold | gold-api.com REST | Real price | Every 60 sec |
-| **XAG/USD** Silver | gold-api.com REST | Real price | Every 60 sec |
+| **XAU/USD** Gold | OKX XAU-USDT-SWAP WebSocket | Real-time push | ~100ms |
+| **XAG/USD** Silver | OKX XAG-USDT-SWAP WebSocket | Real-time push | ~100ms |
 
-> Gold and silver prices update only on API refresh — no simulated drift, static during market close.
+> All symbols stream via OKX WebSocket — tick-level updates, comparable to MT4/MT5.
 
 ---
 
