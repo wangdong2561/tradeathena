@@ -25,14 +25,15 @@ interface Props {
 }
 
 export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
-  // Clocks: UTC in marketwatch, Beijing in statusbar
-  const [utcClock, setUtcClock] = useState('')
+  // Clocks: both display Beijing time
+  const [clockMarket, setClockMarket] = useState('')
   const [bjClock, setBjClock] = useState('')
   useEffect(() => {
     const tick = () => {
       const d = new Date()
-      setUtcClock(d.toISOString().replace('T', ' ').slice(0, 19) + ' UTC')
-      setBjClock(d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+      const bj = d.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      setClockMarket(bj)
+      setBjClock(bj)
     }
     tick()
     const iv = setInterval(tick, 1000)
@@ -276,7 +277,7 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
         <Panel defaultSize={55} minSize={35}>
           <PanelGroup direction="horizontal" autoSaveId="charts-h" style={{ height: '100%' }}>
             <Panel defaultSize={12} minSize={8} maxSize={20}>
-              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} clock={utcClock} />
+              <MarketWatch ticks={ticks} selectedSymbol={selectedSymbol} onSelect={setSelectedSymbol} clock={clockMarket} />
             </Panel>
             <PanelResizeHandle className="resize-handle resize-handle-h" />
             <Panel minSize={30}>
@@ -304,7 +305,7 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
                         <span style={{ width: 40 }}>{p.volume.toFixed(3)}</span>
                         <span style={{ fontWeight: 600, color: pl >= 0 ? 'var(--green)' : 'var(--red)', width: 56 }}>${pl.toFixed(2)}</span>
                         <span style={{ color: 'var(--text-muted)', width: 65, fontSize: 9, fontFamily: 'var(--font-mono)' }}>
-                          {p.created_at ? new Date(p.created_at * 1000).toISOString().slice(11, 16) + ' UTC' : ''}
+                          {p.created_at ? new Date(p.created_at * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false, hour: '2-digit', minute: '2-digit' }) : ''}
                         </span>
                       </div>
                     )

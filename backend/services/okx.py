@@ -1,12 +1,17 @@
-"""OKX REST client — crypto market data accessible from China without proxy."""
+"""OKX REST + WebSocket client — crypto market data with API key support."""
 
 import asyncio
+import base64
+import hmac
 import json
 import logging
 import ssl
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 import httpx
+
+from ..config import settings
 
 # Accept proxy SSL certs (required in China with VPN/proxy)
 _INSECURE_SSL = ssl.create_default_context()
@@ -61,6 +66,28 @@ class OkxClient:
         self.asks: dict[str, float] = {}
         self._callbacks: dict[str, list[Callable]] = {}
         self._running = False
+        self._api_key = settings.okx_api_key
+        self._secret_key = settings.okx_secret_key
+        self._passphrase = settings.okx_passphrase
+
+    def _sign(self, method: str, path: str, body: str = "") -> tuple[str, str, str]:
+        """Create OKX API signature headers."""
+        ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+        msg = ts + method.upper() + path + body
+        mac = hmac.new(self._secret_key.encode(), msg.encode(), "sha256")
+        sign = base64.b64encode(mac.digest()).decode()
+        return ts, sign
+
+    def _auth_headers(self, method: str, path: str, body: str = "") -> dict:
+        if not self._api_key:
+            return {}
+        ts, sign = self._sign(method, path, body)
+        return {
+            "OK-ACCESS-KEY": self._api_key,
+            "OK-ACCESS-SIGN": sign,
+            "OK-ACCESS-TIMESTAMP": ts,
+            "OK-ACCESS-PASSPHRASE": self._passphrase,
+        }
 
     async def _get_http(self) -> httpx.AsyncClient:
         if self._http is None or self._http.is_closed:
@@ -69,11 +96,14 @@ class OkxClient:
 
     async def _get(self, path: str, params: dict = {}) -> dict:
         c = await self._get_http()
-        r = await c.get(path, params=params)
+        qs = "&".join(f"{k}={v}" for k, v in params.items())
+        full_path = path + ("?" + qs if qs else "")
+        headers = self._auth_headers("GET", full_path)
+        r = await c.get(path, params=params, headers=headers)
         r.raise_for_status()
         d = r.json()
         if d.get("code") != "0":
-            raise Exception(f"OKX error: {d.get('msg')}")
+            raise Exception(f"OKX error({d.get('code')}): {d.get('msg')}")
         return d
 
     # ── REST endpoints ──────────────────────────────────
@@ -129,6 +159,29 @@ class OkxClient:
             try:
                 async with websockets.connect(uri, ping_interval=20, ssl=_INSECURE_SSL) as ws:
                     delay = 1.0
+
+                    # Login with API key if configured
+                    if self._api_key and self._secret_key:
+                        login_ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+                        login_msg = login_ts + "GET" + "/users/self/verify"
+                        mac = hmac.new(self._secret_key.encode(), login_msg.encode(), "sha256")
+                        login_sign = base64.b64encode(mac.digest()).decode()
+                        await ws.send(json.dumps({
+                            "op": "login",
+                            "args": [{
+                                "apiKey": self._api_key,
+                                "passphrase": self._passphrase,
+                                "timestamp": login_ts,
+                                "sign": login_sign,
+                            }]
+                        }))
+                        # Wait for login response
+                        try:
+                            login_resp = await asyncio.wait_for(ws.recv(), timeout=5)
+                            logger.info("OKX WS logged in with API key")
+                        except asyncio.TimeoutError:
+                            logger.warning("OKX WS login timeout (continuing without auth)")
+
                     # Build subscription args from registered callbacks
                     seen = set()
                     args = []
