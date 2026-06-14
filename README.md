@@ -259,7 +259,9 @@ tradeathena/
 
 If this project helps you, consider buying the author a coffee ☕
 
-![WeChat Pay QR](pay.jpg)
+![WeChat Pay (微信支付) — Scan this QR code with the WeChat app to send a tip](pay.jpg)
+
+> 💡 **What is this?** This is a **WeChat Pay** QR code. Open the **WeChat** app on your phone, tap the "+" button → "Scan QR Code", then point your camera at the image above to send a tip. WeChat is the most popular payment app in China.
 
 ---
 
