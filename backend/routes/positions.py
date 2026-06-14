@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from ..app_state import get_app_state
+from sqlalchemy import delete
+
 from ..database import async_session
-from ..models import TradeHistory
+from ..models import TradeHistory, ActivePosition
 
 router = APIRouter()
 
@@ -70,7 +72,7 @@ async def close_position(position_id: int, app=Depends(get_app_state)):
     if not ok:
         raise HTTPException(status_code=404, detail="Failed to close position")
 
-    # Save to trade history
+    # Save to trade history & remove from active positions
     async with async_session() as session:
         session.add(TradeHistory(
             position_id=position_id,
@@ -83,6 +85,7 @@ async def close_position(position_id: int, app=Depends(get_app_state)):
             open_time=datetime.now(timezone.utc),
             close_time=datetime.now(timezone.utc),
         ))
+        await session.execute(delete(ActivePosition).where(ActivePosition.position_id == position_id))
         await session.commit()
 
     acc = app.engine.get_account()

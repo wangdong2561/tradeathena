@@ -99,23 +99,19 @@ export const TopBar: React.FC<Props> = ({
         </div>
       )}
 
-      {user && (
-      <div className="user-area" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', paddingLeft: 12, borderLeft: '1px solid var(--border)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 'auto' }}>
         <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-          {user.username}{user.role === 'admin' ? ' 🔧' : ''}
+          {user ? `${user.username}${user.role === 'admin' ? ' 🔧' : ''}` : '未登录'}
         </span>
-        {user.role === 'admin' && (
-          <button onClick={() => setShowAdmin(true)}
-            style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--accent)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>
-            管理
-          </button>
-        )}
+        <button onClick={() => setShowAdmin(true)}
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--accent)', borderRadius: 3, padding: '2px 6px', fontSize: 11, cursor: 'pointer' }}>
+          {user ? '管理' : '登录'}
+        </button>
         <button onClick={onLogout}
-          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 3, padding: '2px 8px', fontSize: 11, cursor: 'pointer' }}>
+          style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--text-muted)', borderRadius: 3, padding: '2px 6px', fontSize: 11, cursor: 'pointer' }}>
           退出
         </button>
       </div>
-      )}
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>

@@ -33,12 +33,16 @@ async def get_klines(
     Forex/commodities → Alpha Vantage-based (real base price + realistic ticks)
     """
     sym = symbol.upper()
-    # Gold & silver → gold-api.com
     if app.gold_client and sym in ["XAUUSD", "XAGUSD"]:
         data = await app.gold_client.get_klines(sym, interval, limit)
-    # Crypto → Binance
     else:
-        data = await app.binance.get_klines(sym, interval, limit)
+        try:
+            data = await app.binance.get_klines(sym, interval, limit)
+        except Exception:
+            if app.backup_binance:
+                data = await app.backup_binance.get_klines(sym, interval, limit)
+            else:
+                raise
     return {"symbol": sym, "interval": interval, "data": data}
 
 
@@ -48,8 +52,14 @@ async def get_ticker(symbol: str, app=Depends(get_app_state)):
     tick = app.get_tick(symbol)
     if tick:
         return tick
-    # Fall back to Binance REST
-    data = await app.binance.get_ticker_24hr(symbol)
+    # Fall back to primary REST, then backup
+    try:
+        data = await app.binance.get_ticker_24hr(symbol)
+    except Exception:
+        if app.backup_binance:
+            data = await app.backup_binance.get_ticker_24hr(symbol)
+        else:
+            return {"symbol": symbol.upper(), "last": 0, "bid": 0, "ask": 0, "change_24h": 0, "volume_24h": 0, "high_24h": 0, "low_24h": 0}
     return {
         "symbol": symbol.upper(),
         "last": float(data.get("lastPrice", 0)),

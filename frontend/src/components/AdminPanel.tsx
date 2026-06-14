@@ -140,7 +140,6 @@ export const AdminPanel: React.FC<Props> = ({ onClose }) => {
                     </span>
                   </td>
                   <td style={{ padding: '6px 4px', textAlign: 'right' }}>
-                    {u.role !== 'admin' && (
                       <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                         <input
                           type="number"
@@ -154,8 +153,7 @@ export const AdminPanel: React.FC<Props> = ({ onClose }) => {
                           修改
                         </button>
                       </div>
-                    )}
-                  </td>
+                    </td>
                 </tr>
               ))}
             </tbody>

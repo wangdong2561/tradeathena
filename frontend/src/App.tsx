@@ -12,7 +12,7 @@ export const App: React.FC = () => {
       const stored = localStorage.getItem('ta_user')
       if (!stored) return null
       const parsed = JSON.parse(stored)
-      return parsed && parsed.username ? parsed : null
+      return parsed && parsed.username && parsed.role ? parsed : null
     } catch { return null }
   })
 

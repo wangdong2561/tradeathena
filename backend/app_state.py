@@ -14,7 +14,8 @@ class AppState:
 
     def __init__(self):
         self.config = settings
-        self.binance = None          # BinanceClient
+        self.binance = None          # Primary data source (BinanceClient or OkxClient)
+        self.backup_binance = None   # Backup data source (only if both are reachable)
         self.market_service = None   # MarketService (crypto)
         self.gold_client = None      # GoldClient (XAUUSD, XAGUSD)
         self.engine = None           # Rust MatchingEngine

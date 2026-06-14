@@ -112,8 +112,8 @@ npm run dev
 | 品种 | 数据源 | 类型 | 更新频率 |
 |:---|:---|:---|:---|
 | **BTC/USDT** | OKX WebSocket | 实时推送 | ~100ms |
-| **XAU/USD** 黄金 | gold-api.com REST | 真实价格 | 每5分钟刷新 |
-| **XAG/USD** 白银 | gold-api.com REST | 真实价格 | 每5分钟刷新 |
+| **XAU/USD** 黄金 | gold-api.com REST | 真实价格 | 每60秒刷新 |
+| **XAG/USD** 白银 | gold-api.com REST | 真实价格 | 每60秒刷新 |
 
 > 黄金白银仅通过 API 刷新更新，中间无模拟波动，休盘期间价格静止。
 

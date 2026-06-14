@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from ..app_state import get_app_state
 from ..database import async_session
-from ..models import OrderHistory, User
+from ..models import OrderHistory, User, ActivePosition, PendingOrderStore
 
 router = APIRouter()
 
@@ -61,9 +61,41 @@ async def place_order(req: PlaceOrderRequest, app=Depends(get_app_state)):
             ))
             await session.commit()
 
+    # Persist active position / pending order to DB
+    import time as _time
+    from datetime import datetime, timezone
+    active_id = getattr(app, "active_user_id", None)
+    now_dt = datetime.now(timezone.utc)
+
+    if result.get("filled") and result.get("order_id", 0) > 0:
+        # Market order filled → save position
+        positions = app.engine.get_positions()
+        if positions:
+            async with async_session() as session:
+                pos = positions[-1]  # last position is the one just opened
+                session.add(ActivePosition(
+                    position_id=pos["id"], user_id=active_id or 1,
+                    symbol=pos["symbol"], side=pos["side"],
+                    volume=pos["volume"], entry_price=pos["entry_price"],
+                    current_price=pos["current_price"],
+                    stop_loss=pos.get("stop_loss", 0), take_profit=pos.get("take_profit", 0),
+                    created_at=now_dt,
+                ))
+                await session.commit()
+    elif req.order_type in ("limit", "stop") and result.get("order_id", 0) > 0:
+        # Limit/stop order → save pending order
+        async with async_session() as session:
+            session.add(PendingOrderStore(
+                order_id=result["order_id"], user_id=active_id or 1,
+                symbol=sym, side=req.side, order_type=req.order_type,
+                volume=req.volume, price=req.price, stop_price=req.stop_price,
+                stop_loss=req.stop_loss, take_profit=req.take_profit,
+                created_at=now_dt,
+            ))
+            await session.commit()
+
     # Persist balance to DB if a real trade happened
     if result.get("filled"):
-        active_id = getattr(app, "active_user_id", None)
         if active_id:
             engine_balance = app.engine.get_account().get("balance", 0)
             async with async_session() as session:
@@ -90,6 +122,11 @@ async def cancel_order(order_id: int, app=Depends(get_app_state)):
     ok = app.engine.cancel_order(order_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Order not found or already filled")
+    # Remove from persistent store
+    async with async_session() as session:
+        from sqlalchemy import delete
+        await session.execute(delete(PendingOrderStore).where(PendingOrderStore.order_id == order_id))
+        await session.commit()
     await app.ws_manager.broadcast_order_update({"action": "cancelled", "order_id": order_id})
     return {"success": True, "order_id": order_id}
 

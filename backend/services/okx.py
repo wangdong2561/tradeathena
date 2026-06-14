@@ -16,17 +16,26 @@ _INSECURE_SSL.verify_mode = ssl.CERT_NONE
 logger = logging.getLogger(__name__)
 
 # Symbol: BTCUSDT → BTC-USDT
+# Gold/silver → OKX perpetual swap contracts for tick-level WebSocket data
+_GOLD_SILVER_SWAP = {"XAUUSD": "XAU-USDT-SWAP", "XAGUSD": "XAG-USDT-SWAP"}
+
 def _to_okx(s: str) -> str:
     raw = s.upper().strip()
+    # Gold/silver → perpetual swap (WebSocket tick-level)
+    if raw in _GOLD_SILVER_SWAP:
+        return _GOLD_SILVER_SWAP[raw]
     if "-" in raw:
         return raw
-    # Known quote currencies in order of length (longest first)
     for q in ["USDT", "USDC", "USD", "BTC", "ETH"]:
         if raw.endswith(q) and len(raw) > len(q):
             return f"{raw[:-len(q)]}-{q}"
     return raw
 
 def _from_okx(s: str) -> str:
+    # Reverse swap mapping: XAU-USDT-SWAP → XAUUSD
+    for k, v in _GOLD_SILVER_SWAP.items():
+        if s == v:
+            return k
     return s.replace("-", "").upper()
 
 _INTERVAL_MAP = {

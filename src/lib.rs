@@ -141,6 +141,64 @@ impl PyMatchingEngine {
         engine.reset(initial_balance);
         Ok(())
     }
+
+    fn restore_state(
+        &self,
+        py: Python<'_>,
+        positions: Vec<Bound<'_, PyDict>>,
+        orders: Vec<Bound<'_, PyDict>>,
+        balance: f64,
+    ) -> PyResult<()> {
+        let mut engine = self.inner.lock().map_err(|e| PyRuntimeError::new_err(e.to_string()))?;
+
+        // Helper: get a field from a PyDict, returns default if missing
+        let get_f64 = |d: &Bound<'_, PyDict>, k: &str| -> f64 {
+            d.get_item(k).ok().flatten().and_then(|v| v.extract::<f64>().ok()).unwrap_or(0.0)
+        };
+        let get_u64 = |d: &Bound<'_, PyDict>, k: &str| -> u64 {
+            d.get_item(k).ok().flatten().and_then(|v| v.extract::<u64>().ok()).unwrap_or(0)
+        };
+        let get_str = |d: &Bound<'_, PyDict>, k: &str| -> String {
+            d.get_item(k).ok().flatten().and_then(|v| v.extract::<String>().ok()).unwrap_or_default()
+        };
+        let get_i64 = |d: &Bound<'_, PyDict>, k: &str| -> i64 {
+            d.get_item(k).ok().flatten().and_then(|v| v.extract::<i64>().ok()).unwrap_or(0)
+        };
+
+        let rust_positions: Vec<types::Position> = positions.iter().map(|d| types::Position {
+            id: get_u64(d, "id"),
+            account_id: 1,
+            symbol: get_str(d, "symbol"),
+            side: types::Side::from_str(&get_str(d, "side")),
+            volume: get_f64(d, "volume"),
+            entry_price: get_f64(d, "entry_price"),
+            current_price: get_f64(d, "current_price"),
+            stop_loss: get_f64(d, "stop_loss"),
+            take_profit: get_f64(d, "take_profit"),
+            unrealized_pl: 0.0,
+            created_at: get_i64(d, "created_at"),
+        }).collect();
+
+        let rust_orders: Vec<types::Order> = orders.iter().map(|d| types::Order {
+            id: get_u64(d, "id"),
+            account_id: 1,
+            symbol: get_str(d, "symbol"),
+            side: types::Side::from_str(&get_str(d, "side")),
+            order_type: types::OrderType::from_str(&get_str(d, "order_type")),
+            volume: get_f64(d, "volume"),
+            price: get_f64(d, "price"),
+            stop_price: get_f64(d, "stop_price"),
+            filled_price: 0.0,
+            filled_volume: 0.0,
+            status: types::OrderStatus::Pending,
+            stop_loss: get_f64(d, "stop_loss"),
+            take_profit: get_f64(d, "take_profit"),
+            created_at: get_i64(d, "created_at"),
+        }).collect();
+
+        engine.restore_state(rust_positions, rust_orders, balance);
+        Ok(())
+    }
 }
 
 #[pymodule]

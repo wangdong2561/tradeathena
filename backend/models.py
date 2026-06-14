@@ -43,6 +43,43 @@ class OrderHistory(Base):
     closed_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
+class ActivePosition(Base):
+    """Persistent active positions — survives restart."""
+
+    __tablename__ = "active_positions"
+
+    id = Column(Integer, primary_key=True)
+    position_id = Column(Integer, nullable=False)  # Rust engine position ID
+    user_id = Column(Integer, default=1)
+    symbol = Column(String, nullable=False)
+    side = Column(String, nullable=False)
+    volume = Column(Float, nullable=False)
+    entry_price = Column(Float, nullable=False)
+    current_price = Column(Float, nullable=False)
+    stop_loss = Column(Float, default=0.0)
+    take_profit = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
+class PendingOrderStore(Base):
+    """Persistent pending orders — survives restart."""
+
+    __tablename__ = "pending_orders_store"
+
+    id = Column(Integer, primary_key=True)
+    order_id = Column(Integer, nullable=False)  # Rust engine order ID
+    user_id = Column(Integer, default=1)
+    symbol = Column(String, nullable=False)
+    side = Column(String, nullable=False)
+    order_type = Column(String, nullable=False)
+    volume = Column(Float, nullable=False)
+    price = Column(Float, default=0.0)
+    stop_price = Column(Float, default=0.0)
+    stop_loss = Column(Float, default=0.0)
+    take_profit = Column(Float, default=0.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+
 class TradeHistory(Base):
     """Historical record of closed trades (positions)."""
 

@@ -20,9 +20,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("toptrader")
 
+from sqlalchemy import select
+
 from .app_state import AppState
 from .config import settings
-from .database import init_db
+from .database import async_session, init_db
 
 
 def _create_engine():
@@ -61,6 +63,7 @@ def _create_py_fallback():
         def modify_position(self, _id, sl, tp): return True
         def close_position(self, _id, bid, ask, last): return True
         def reset(self, balance): self._balance = balance
+        def restore_state(self, _positions, _orders, _balance): pass
     return _PyEngine(settings.default_balance, settings.max_leverage)
 
 
@@ -74,24 +77,28 @@ def _enrich_account(state) -> dict:
     return acc
 
 
-async def _check_mode() -> str:
-    """Check reachable data source: 'BINANCE' > 'OKX' > 'SIMULATOR'."""
+async def _check_mode() -> tuple[str, str | None]:
+    """Check reachable data source: BINANCE > OKX > SIMULATOR (parallel)."""
     import httpx
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as c:
-            r = await c.get("https://api.binance.com/api/v3/ping")
-            if r.status_code == 200:
-                return "BINANCE"
-    except Exception:
-        pass
-    try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as c:
-            r = await c.get("https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT")
-            if r.status_code == 200 and r.json().get("code") == "0":
-                return "OKX"
-    except Exception:
-        pass
-    return "SIMULATOR"
+
+    async def _try(url: str, check: callable) -> bool:
+        try:
+            async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), verify=False) as c:
+                r = await c.get(url)
+                return check(r)
+        except Exception:
+            return False
+
+    results = await asyncio.gather(
+        _try("https://api.binance.com/api/v3/ping", lambda r: r.status_code == 200),
+        _try("https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT",
+             lambda r: r.status_code == 200 and r.json().get("code") == "0"),
+    )
+    if results[0]:
+        return "BINANCE", ("OKX" if results[1] else None)
+    if results[1]:
+        return "OKX", None
+    return "SIMULATOR", None
 
 
 @asynccontextmanager
@@ -100,44 +107,45 @@ async def lifespan(app: FastAPI):
     state.engine = _create_engine()
     state.app = app
 
-    mode = await _check_mode()
-    logger.info("Data source: %s", mode)
+    primary, backup = await _check_mode()
+    logger.info("Data source: %s%s", primary, f" + backup({backup})" if backup else "")
 
-    if mode == "BINANCE":
+    _ws = None
+    if primary == "BINANCE":
         from .services.binance import BinanceClient
-        from .ws.manager import WSManager
         state.binance = BinanceClient()
-        state.ws_manager = WSManager()
-        from .services.market import MarketService
-        state.market_service = MarketService(state.binance)
-        state.gold_client = None
-        try:
-            from .services.gold_client import GoldClient
-            state.gold_client = GoldClient()
-        except Exception as e:
-            logger.warning("Gold init failed: %s", e)
-
-    elif mode == "OKX":
+        if backup == "OKX":
+            from .services.okx import OkxClient
+            state.backup_binance = OkxClient()
+    elif primary == "OKX":
         from .services.okx import OkxClient
-        from .ws.manager import WSManager
         state.binance = OkxClient()
-        state.ws_manager = WSManager()
-        from .services.market import MarketService
-        state.market_service = MarketService(state.binance)
-        state.gold_client = None
-        try:
-            from .services.gold_client import GoldClient
-            state.gold_client = GoldClient()
-        except Exception as e:
-            logger.warning("Gold init failed: %s", e)
-
+        if backup == "BINANCE":
+            from .services.binance import BinanceClient
+            state.backup_binance = BinanceClient()
     else:
         from .services.simulator import MarketSimulator, SimulatedBinanceClient
-        from .ws.manager import WSManager
         sim = MarketSimulator()
         state.market_service = sim
         state.binance = SimulatedBinanceClient(sim)
-        state.ws_manager = WSManager()
+
+    from .ws.manager import WSManager
+    state.ws_manager = WSManager()
+
+    # Create MarketService for real data sources (not simulator)
+    if primary in ("BINANCE", "OKX"):
+        from .services.market import MarketService
+        state.market_service = MarketService(state.binance)
+
+    # Gold client only in BINANCE mode (OKX has XAU/XAG via WebSocket swaps)
+    if primary == "BINANCE":
+        try:
+            from .services.gold_client import GoldClient
+            state.gold_client = GoldClient()
+        except Exception as e:
+            logger.warning("Gold init failed: %s", e)
+    else:
+        state.gold_client = None
 
     # Register ticker → Rust engine callback
     async def on_ticker(tick: dict):
@@ -161,13 +169,15 @@ async def lifespan(app: FastAPI):
                     # Offload DB write
                     async def _save(p=pos, cp=cp, pl=profit):
                         from .database import async_session
-                        from .models import TradeHistory
+                        from .models import TradeHistory, ActivePosition
+                        from sqlalchemy import delete
                         async with async_session() as s:
                             s.add(TradeHistory(
                                 position_id=p["id"], symbol=p["symbol"], side=p["side"],
                                 volume=p["volume"], entry_price=p["entry_price"],
                                 exit_price=cp, profit=pl,
                             ))
+                            await s.execute(delete(ActivePosition).where(ActivePosition.position_id == p["id"]))
                             await s.commit()
                     asyncio.create_task(_save())
 
@@ -188,13 +198,56 @@ async def lifespan(app: FastAPI):
 
     # Start data sources
     await init_db()
+
+    # Restore positions and pending orders from DB (survives restart)
+    try:
+        from .models import ActivePosition, PendingOrderStore
+        from datetime import datetime
+        async with async_session() as session:
+            # Load active positions
+            pos_result = await session.execute(
+                select(ActivePosition).order_by(ActivePosition.id)
+            )
+            db_positions = pos_result.scalars().all()
+
+            # Load pending orders
+            ord_result = await session.execute(
+                select(PendingOrderStore).order_by(PendingOrderStore.id)
+            )
+            db_orders = ord_result.scalars().all()
+
+        if db_positions or db_orders:
+            positions_data = [{
+                "id": p.position_id, "symbol": p.symbol, "side": p.side,
+                "volume": p.volume, "entry_price": p.entry_price,
+                "current_price": p.current_price, "stop_loss": p.stop_loss,
+                "take_profit": p.take_profit,
+                "created_at": int(p.created_at.timestamp()) if p.created_at else 0,
+            } for p in db_positions]
+
+            orders_data = [{
+                "id": o.order_id, "symbol": o.symbol, "side": o.side,
+                "order_type": o.order_type, "volume": o.volume,
+                "price": o.price, "stop_price": o.stop_price,
+                "stop_loss": o.stop_loss, "take_profit": o.take_profit,
+                "created_at": int(o.created_at.timestamp()) if o.created_at else 0,
+            } for o in db_orders]
+
+            state.engine.restore_state(positions_data, orders_data, 0)
+            logger.info(
+                "Restored %d positions, %d pending orders from DB",
+                len(db_positions), len(db_orders),
+            )
+    except Exception as e:
+        logger.warning("State restore skipped: %s", e)
+
     await state.binance.start(settings.default_symbols)
     await state.market_service.start(settings.default_symbols)
     if state.gold_client:
         await state.gold_client.start()
 
     app.state.app_state = state
-    logger.info("═══ TradeAthena ready [%s] ═══", mode)
+    logger.info("═══ TradeAthena ready [%s] ═══", primary)
     yield
 
     await state.market_service.stop()
@@ -212,11 +265,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routes import market, orders, account, positions
+from .routes import market, orders, account, positions, auth, admin
 app.include_router(market.router, prefix="/api/v1/market", tags=["market"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["orders"])
 app.include_router(account.router, prefix="/api/v1/account", tags=["account"])
 app.include_router(positions.router, prefix="/api/v1/positions", tags=["positions"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 
 # ── WebSocket ──────────────────────────────────────────

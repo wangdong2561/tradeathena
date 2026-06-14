@@ -491,6 +491,31 @@ impl MatchingEngine {
         self.account.free_margin = initial_balance;
         self.account.margin_level = 0.0;
     }
+
+    /// Restore state from persistent storage (after restart).
+    /// Takes ownership of provided vectors — no copying on hot path.
+    pub fn restore_state(
+        &mut self,
+        positions: Vec<Position>,
+        pending_orders: Vec<Order>,
+        balance: f64,
+    ) {
+        self.positions = positions;
+        self.pending_orders = pending_orders;
+        self.account.balance = balance;
+
+        // Rebuild symbol index for pending orders
+        self.rebuild_symbol_index();
+
+        // Set current_price = entry_price for each position;
+        // recalc_account will compute unrealized P&L correctly.
+        for pos in &mut self.positions {
+            pos.current_price = pos.entry_price;
+            pos.unrealized_pl = 0.0;
+        }
+
+        self.recalc_account();
+    }
 }
 
 #[cfg(test)]

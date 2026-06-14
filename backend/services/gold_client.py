@@ -123,9 +123,9 @@ class GoldClient:
             self._xag_tick = tick
 
     async def _refresh_loop(self):
-        """Re-fetch from API every 5 minutes."""
+        """Re-fetch from API every 60 seconds (MT4/MT5-like frequency)."""
         while self._running:
-            await asyncio.sleep(300)
+            await asyncio.sleep(60)
             if self._running:
                 await self._refresh()
 
