@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react'
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 
-import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, subscribeKline, fetchNews, reloadEngine } from '../api'
+import { fetchKlines, fetchSymbols, getAccount, getPositions, getPendingOrders, subscribeKline, fetchNews } from '../api'
 import { wsClient } from '../websocket'
-import type { Ticker, Account, Kline, Position, PendingOrder, TradeResult, TradeMarker, User } from '../types'
+import type { Ticker, Account, Kline, Position, PendingOrder, TradeResult, TradeMarker } from '../types'
 import { StrategyPanel, signalToMarker } from './StrategyPanel'
 import { DEFAULT_STRATEGY_CONFIG, type StrategyConfig, type StrategySignal } from '../utils/strategy'
 
@@ -19,12 +19,7 @@ import '../styles.css'
 
 type Tab = 'trade' | 'positions' | 'orders' | 'history' | 'strategy'
 
-interface Props {
-  user: User
-  onLogout: () => void
-}
-
-export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
+export const TradingPage: React.FC = () => {
   // Clocks: UTC in marketwatch, Beijing in statusbar
   const [utcClock, setUtcClock] = useState('')
   const [bjClock, setBjClock] = useState('')
@@ -88,8 +83,6 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
   // ── Initial Data Load ──────────────────────────────────
 
   useEffect(() => {
-    // Re-init engine with stored user's balance (handles page refresh / server restart)
-    reloadEngine().catch(() => {})
     fetchSymbols().then(data => {
       if (data.length > 0) setSymbols(data.map(t => t.symbol))
       const tickMap: Record<string, Ticker> = {}
@@ -270,8 +263,6 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
         selectedSymbol={selectedSymbol}
         onSymbolChange={setSelectedSymbol}
         account={account}
-        user={user}
-        onLogout={onLogout}
       />
 
       <PanelGroup direction="vertical" autoSaveId="main5" style={{ flex: 1, minHeight: 0 }}>
@@ -394,8 +385,6 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
                   onNewSignal={(sig) => {
                     lastSignalType.current = sig.type
                     setStrategyMarkers(prev => [...prev, signalToMarker(sig)])
-                    // Auto-switch to strategy tab briefly to show the signal
-                    setTerminalTab('strategy')
                   }}
                 />
               )}

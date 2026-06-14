@@ -21,14 +21,9 @@ export function calcBollingerBands(
   const middle: (number | null)[] = []
   const upper: (number | null)[] = []
   const lower: (number | null)[] = []
-
   for (let i = 0; i < data.length; i++) {
     const m = sma[i]
-    if (m === null) {
-      middle.push(null); upper.push(null); lower.push(null)
-      continue
-    }
-    // Population standard deviation
+    if (m === null) { middle.push(null); upper.push(null); lower.push(null); continue }
     let sumSq = 0
     for (let j = 0; j < period; j++) {
       const diff = data[i - j].close - m

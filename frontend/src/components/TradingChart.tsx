@@ -171,35 +171,12 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
         crosshairMarkerVisible: false,
       })
 
-      // Bollinger Bands — upper
-      const bbu = chart.addLineSeries({
-        color: 'rgba(38, 166, 154, 0.6)', lineWidth: 1, lineStyle: 2,
-        priceScaleId: 'right',
-        lastValueVisible: false, priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      })
-      // Bollinger Bands — middle (SMA)
-      const bbm = chart.addLineSeries({
-        color: 'rgba(38, 166, 154, 0.8)', lineWidth: 1,
-        priceScaleId: 'right',
-        lastValueVisible: false, priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      })
-      // Bollinger Bands — lower
-      const bbl = chart.addLineSeries({
-        color: 'rgba(38, 166, 154, 0.6)', lineWidth: 1, lineStyle: 2,
-        priceScaleId: 'right',
-        lastValueVisible: false, priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      })
-
+      // Bollinger Bands
+      const bbu = chart.addLineSeries({ color: 'rgba(38,166,154,0.6)', lineWidth: 1, lineStyle: 2, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+      const bbm = chart.addLineSeries({ color: 'rgba(38,166,154,0.8)', lineWidth: 1, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
+      const bbl = chart.addLineSeries({ color: 'rgba(38,166,154,0.6)', lineWidth: 1, lineStyle: 2, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
       // 200 EMA
-      const e200 = chart.addLineSeries({
-        color: '#ff6f00', lineWidth: 1, lineStyle: 3,
-        priceScaleId: 'right',
-        lastValueVisible: false, priceLineVisible: false,
-        crosshairMarkerVisible: false,
-      })
+      const e200 = chart.addLineSeries({ color: '#ff6f00', lineWidth: 1, lineStyle: 3, priceScaleId: 'right', lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false })
 
       chartRef.current = chart
       candleSeries.current = candles
@@ -383,47 +360,6 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
     })
   }, [data, ema20Data, ema50Data, showEMA])
 
-  // ── Update Bollinger Bands ──────────────────────────
-
-  useEffect(() => {
-    if (!bbUpperSeries.current || !bbMiddleSeries.current || !bbLowerSeries.current) return
-    if (data.length < 20 || bbData.upper.length === 0) return
-    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
-    const t = (i: number) => sorted[i].time as any
-
-    const upper: LineData[] = []
-    const middle: LineData[] = []
-    const lower: LineData[] = []
-    for (let i = 0; i < sorted.length; i++) {
-      if (bbData.upper[i] !== null) {
-        upper.push({ time: t(i), value: bbData.upper[i]! })
-        middle.push({ time: t(i), value: bbData.middle[i]! })
-        lower.push({ time: t(i), value: bbData.lower[i]! })
-      }
-    }
-    sd(bbUpperSeries.current, upper)
-    sd(bbMiddleSeries.current, middle)
-    sd(bbLowerSeries.current, lower)
-    bbUpperSeries.current.applyOptions({ visible: showBB })
-    bbMiddleSeries.current.applyOptions({ visible: showBB })
-    bbLowerSeries.current.applyOptions({ visible: showBB })
-  }, [data, bbData, showBB])
-
-  // ── Update 200 EMA ──────────────────────────────────
-
-  useEffect(() => {
-    if (!ema200Series.current || data.length < 200) return
-    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
-    const t = (i: number) => sorted[i].time as any
-
-    const line: LineData[] = []
-    for (let i = 0; i < sorted.length; i++) {
-      if (ema200Data[i] !== null) line.push({ time: t(i), value: ema200Data[i]! })
-    }
-    sd(ema200Series.current, line)
-    ema200Series.current.applyOptions({ visible: showEMA200 })
-  }, [data, ema200Data, showEMA200])
-
   // ── RSI pane ─────────────────────────────────────────
 
   useEffect(() => {
@@ -462,6 +398,43 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
       chartRef.current.priceScale('rsi').applyOptions({ visible: showRSI })
     } catch {}
   }, [showRSI])
+
+  // ── Update Bollinger Bands ──────────────────────────
+
+  useEffect(() => {
+    if (!bbUpperSeries.current || !bbMiddleSeries.current || !bbLowerSeries.current) return
+    if (data.length < 20 || bbData.upper.length === 0) return
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    const t = (i: number) => sorted[i].time as any
+    const upper: LineData[] = [], middle: LineData[] = [], lower: LineData[] = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (bbData.upper[i] !== null) {
+        upper.push({ time: t(i), value: bbData.upper[i]! })
+        middle.push({ time: t(i), value: bbData.middle[i]! })
+        lower.push({ time: t(i), value: bbData.lower[i]! })
+      }
+    }
+    sd(bbUpperSeries.current, upper)
+    sd(bbMiddleSeries.current, middle)
+    sd(bbLowerSeries.current, lower)
+    bbUpperSeries.current.applyOptions({ visible: showBB })
+    bbMiddleSeries.current.applyOptions({ visible: showBB })
+    bbLowerSeries.current.applyOptions({ visible: showBB })
+  }, [data, bbData, showBB])
+
+  // ── Update 200 EMA ──────────────────────────────────
+
+  useEffect(() => {
+    if (!ema200Series.current || data.length < 200) return
+    const sorted = [...data].sort((a, b) => (Number(a.time) - Number(b.time)))
+    const t = (i: number) => sorted[i].time as any
+    const line: LineData[] = []
+    for (let i = 0; i < sorted.length; i++) {
+      if (ema200Data[i] !== null) line.push({ time: t(i), value: ema200Data[i]! })
+    }
+    sd(ema200Series.current, line)
+    ema200Series.current.applyOptions({ visible: showEMA200 })
+  }, [data, ema200Data, showEMA200])
 
   // ── Trade markers (entry/exit arrows) ──────────────
 

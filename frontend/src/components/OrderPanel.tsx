@@ -38,11 +38,16 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
 
   // ── SL/TP presets ──────────────────────────────────
 
+  // Track current side for SL/TP direction
+  const [activeSide, setActiveSide] = useState<'buy' | 'sell'>('buy')
+
   const applySL = useCallback((pct: number) => {
     if (midPrice > 0) {
-      setStopLoss((midPrice * (1 - pct / 100)).toFixed(2))
+      // For buy: SL below price; for sell: SL above price
+      const mult = activeSide === 'buy' ? (1 - pct / 100) : (1 + pct / 100)
+      setStopLoss((midPrice * mult).toFixed(2))
     }
-  }, [midPrice])
+  }, [midPrice, activeSide])
 
   const applyTP = useCallback((mult: number) => {
     const sl = parseFloat(stopLoss)
@@ -159,10 +164,12 @@ export const OrderPanel: React.FC<Props> = ({ symbol, ticker, account, onOrderRe
       {/* 买卖按钮 (prominent, always visible) */}
       <div className="action-btns" style={{ gridColumn: '1 / -1', marginTop: 0 }}>
         <button className="btn-buy" onClick={() => handleSubmit('buy')}
+          onMouseEnter={() => setActiveSide('buy')}
           style={{ padding: '10px 0', fontSize: 15, fontWeight: 700 }}>
           ▲ 买入 {buyPrice > 0 ? `$${buyPrice.toFixed(precision)}` : ''}
         </button>
         <button className="btn-sell" onClick={() => handleSubmit('sell')}
+          onMouseEnter={() => setActiveSide('sell')}
           style={{ padding: '10px 0', fontSize: 15, fontWeight: 700 }}>
           ▼ 卖出 {sellPrice > 0 ? `$${sellPrice.toFixed(precision)}` : ''}
         </button>

@@ -57,6 +57,7 @@ export interface PendingOrder {
   filled_price: number
   stop_loss: number
   take_profit: number
+  created_at?: number
 }
 
 export interface TradeResult {

@@ -90,6 +90,7 @@ pub struct Order {
     pub status: OrderStatus,
     pub stop_loss: f64,
     pub take_profit: f64,
+    pub created_at: i64,  // unix timestamp seconds
 }
 
 #[derive(Debug, Clone)]

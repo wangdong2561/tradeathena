@@ -115,6 +115,7 @@ impl PyMatchingEngine {
                 "filled_price" => o.filled_price,
                 "stop_loss" => o.stop_loss,
                 "take_profit" => o.take_profit,
+                "created_at" => o.created_at as i64,
             )
         }).collect();
         Ok(items.into_py(py))

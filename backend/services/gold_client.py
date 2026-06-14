@@ -4,7 +4,6 @@ Returns live XAU/USD and XAG/USD prices.
 """
 
 import asyncio
-import json
 import logging
 import random
 from datetime import datetime, timezone
@@ -14,12 +13,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-# Realistic base prices (updated from API on each fetch)
 BASE_GOLD = 4200.0
 BASE_SILVER = 68.0
-
-GOLD_VOLATILITY = 0.5   # $ per tick movement
-SILVER_VOLATILITY = 0.03
 
 
 class GoldClient:
@@ -57,16 +52,12 @@ class GoldClient:
         self._init_ticks()
         # First real fetch
         await self._refresh()
-        # Sim loop (~2 ticks/sec)
-        self._sim_task = asyncio.create_task(self._sim_loop())
-        # Refresh from API every 5 minutes
+        # Only refresh from API every 5 minutes — no sim noise
         self._refresh_task = asyncio.create_task(self._refresh_loop())
-        logger.info("Gold/Silver client started")
+        logger.info("Gold/Silver client started (real prices, no sim noise)")
 
     async def stop(self):
         self._running = False
-        if self._sim_task:
-            self._sim_task.cancel()
         if self._refresh_task:
             self._refresh_task.cancel()
 
@@ -131,26 +122,6 @@ class GoldClient:
         else:
             self._xag_tick = tick
 
-    async def _sim_loop(self):
-        """Realistic tick movement between API refreshes."""
-        while self._running:
-            for tick in [self._xau_tick, self._xag_tick]:
-                if not tick:
-                    continue
-                vol = GOLD_VOLATILITY if tick["symbol"] == "XAUUSD" else SILVER_VOLATILITY
-                noise = random.gauss(0, 1) * vol
-                tick["last"] = max(tick["last"] * 0.99, min(tick["last"] * 1.01, tick["last"] + noise))
-                sp = tick["last"] * 0.0003
-                tick["bid"] = tick["last"] - sp / 2
-                tick["ask"] = tick["last"] + sp / 2
-                tick["updated_at"] = datetime.now(timezone.utc).isoformat()
-                for cb in self._callbacks:
-                    try:
-                        await cb(tick)
-                    except Exception:
-                        pass
-            await asyncio.sleep(0.5)
-
     async def _refresh_loop(self):
         """Re-fetch from API every 5 minutes."""
         while self._running:
@@ -162,7 +133,7 @@ class GoldClient:
         """Generate realistic klines around current real price."""
         tick = self._xau_tick if symbol.upper() == "XAUUSD" else self._xag_tick
         base = tick["last"] if tick else (BASE_GOLD if symbol.upper() == "XAUUSD" else BASE_SILVER)
-        vol = GOLD_VOLATILITY if symbol.upper() == "XAUUSD" else SILVER_VOLATILITY
+        vol = base * 0.002  # ~0.2% per tick
 
         interval_ms = {"1m": 60000, "5m": 300000, "15m": 900000, "30m": 1800000,
                        "1h": 3600000, "4h": 14400000, "1d": 86400000}.get(interval, 3600000)

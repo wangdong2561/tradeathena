@@ -10,8 +10,6 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager
 
-import httpx
-
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -76,19 +74,24 @@ def _enrich_account(state) -> dict:
     return acc
 
 
-async def _check_connectivity() -> bool:
-    """Check if Binance API is reachable."""
+async def _check_mode() -> str:
+    """Check reachable data source: 'BINANCE' > 'OKX' > 'SIMULATOR'."""
+    import httpx
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0), verify=False) as client:
-            resp = await client.get("https://api.binance.com/api/v3/ping")
-            return resp.status_code == 200
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as c:
+            r = await c.get("https://api.binance.com/api/v3/ping")
+            if r.status_code == 200:
+                return "BINANCE"
     except Exception:
-        return False
-
-
-def _create_data_sources(state: AppState):
-    """Create either Binance or simulator data sources based on connectivity."""
-    return ("binance", None, None)  # Will be set in lifespan
+        pass
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(5.0)) as c:
+            r = await c.get("https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT")
+            if r.status_code == 200 and r.json().get("code") == "0":
+                return "OKX"
+    except Exception:
+        pass
+    return "SIMULATOR"
 
 
 @asynccontextmanager
@@ -97,31 +100,40 @@ async def lifespan(app: FastAPI):
     state.engine = _create_engine()
     state.app = app
 
-    # Detect network mode — Binance or Simulator
-    online = await _check_connectivity()
-    logger.info("Network check: %s", "ONLINE (Binance)" if online else "OFFLINE (Simulator)")
+    mode = await _check_mode()
+    logger.info("Data source: %s", mode)
 
-    if online:
+    if mode == "BINANCE":
         from .services.binance import BinanceClient
         from .ws.manager import WSManager
-
         state.binance = BinanceClient()
         state.ws_manager = WSManager()
-
         from .services.market import MarketService
         state.market_service = MarketService(state.binance)
-
-        # Start gold & silver data source (gold-api.com)
         state.gold_client = None
         try:
             from .services.gold_client import GoldClient
             state.gold_client = GoldClient()
         except Exception as e:
-            logger.warning("Gold client init failed: %s", e)
+            logger.warning("Gold init failed: %s", e)
+
+    elif mode == "OKX":
+        from .services.okx import OkxClient
+        from .ws.manager import WSManager
+        state.binance = OkxClient()
+        state.ws_manager = WSManager()
+        from .services.market import MarketService
+        state.market_service = MarketService(state.binance)
+        state.gold_client = None
+        try:
+            from .services.gold_client import GoldClient
+            state.gold_client = GoldClient()
+        except Exception as e:
+            logger.warning("Gold init failed: %s", e)
+
     else:
         from .services.simulator import MarketSimulator, SimulatedBinanceClient
         from .ws.manager import WSManager
-
         sim = MarketSimulator()
         state.market_service = sim
         state.binance = SimulatedBinanceClient(sim)
@@ -182,7 +194,7 @@ async def lifespan(app: FastAPI):
         await state.gold_client.start()
 
     app.state.app_state = state
-    logger.info("═══ TradeAthena ready [%s] ═══", "BINANCE" if online else "SIMULATOR")
+    logger.info("═══ TradeAthena ready [%s] ═══", mode)
     yield
 
     await state.market_service.stop()
@@ -200,13 +212,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from .routes import market, orders, account, positions, auth, admin
+from .routes import market, orders, account, positions
 app.include_router(market.router, prefix="/api/v1/market", tags=["market"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["orders"])
 app.include_router(account.router, prefix="/api/v1/account", tags=["account"])
 app.include_router(positions.router, prefix="/api/v1/positions", tags=["positions"])
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-app.include_router(admin.router, prefix="/api/v1/admin", tags=["admin"])
 
 
 # ── WebSocket ──────────────────────────────────────────

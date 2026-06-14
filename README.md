@@ -172,6 +172,10 @@ tradeathena/
 | EMA 20/50 Indicators | ✅ | Toggle display |
 | Golden/Death Cross Detection | ✅ | Auto ◆ markers + counters |
 | RSI Indicator | ✅ | 14-period, overbought/oversold |
+| Bollinger Bands | ✅ | 20,2 with upper/middle/lower bands |
+| 200 EMA | ✅ | Long-term trend indicator, toggle display |
+| Strategy: BB + RSI | ✅ | Buy/Sell signals on chart, configurable params |
+| Strategy Panel | ✅ | Real-time status & parameter tuning |
 | Horizontal Line Drawing | ✅ | Click to place, clearable |
 | Entry/Exit Markers | ✅ | Auto-arrows on chart |
 | Bid/Ask Reference Lines | ✅ | Red=Ask, Gray=Bid |
@@ -183,6 +187,33 @@ tradeathena/
 | Login Page | ✅ | Default admin/admin123 |
 | Symbol Info | ✅ | Trading hours, exchange, specs |
 | Error Boundary | ✅ | No black screen on crash |
+
+---
+
+## 📊 Built-in Strategy: Bollinger Bands + RSI
+
+A configurable quantitative strategy that generates buy/sell signals on the chart.
+
+### Entry Conditions
+
+| Signal | Condition 1 | Condition 2 | Optional Filter |
+|:---|:---|:---|:---|
+| **🟢 Buy** (Long) | Price ≤ BB Lower Band | RSI < 30 (Oversold) | Price above 200 EMA |
+| **🔴 Sell** (Short) | Price ≥ BB Upper Band | RSI > 70 (Overbought) | Price below 200 EMA |
+
+### Exit Rules (manual execution guided by panel)
+
+1. **Price returns to middle band** → Close 50% position
+2. **Price hits opposite band** → Close 100%
+3. **Fixed stop loss** → Default -1.5% (configurable)
+
+### Configuration
+- BB Period (default 20) & Standard Deviation (default 2)
+- RSI Oversold (default 30) & Overbought (default 70) thresholds
+- 200 EMA Trend Filter toggle
+- Stop Loss % (default 1.5%)
+
+Signals appear as arrows on the chart. Open the **Strategy** tab in the terminal panel to monitor real-time status and adjust parameters.
 
 ---
 

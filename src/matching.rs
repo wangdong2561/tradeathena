@@ -8,7 +8,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::types::*;
 
-static NEXT_ORDER_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_ORDER_ID: AtomicU64 = AtomicU64::new(100_000_000);
 static NEXT_POSITION_ID: AtomicU64 = AtomicU64::new(1);
 
 /// The matching engine holds all runtime state.
@@ -121,6 +121,10 @@ impl MatchingEngine {
             status: OrderStatus::Pending,
             stop_loss,
             take_profit,
+            created_at: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs() as i64,
         };
 
         let idx = self.pending_orders.len();
