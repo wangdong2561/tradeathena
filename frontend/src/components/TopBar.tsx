@@ -99,6 +99,7 @@ export const TopBar: React.FC<Props> = ({
         </div>
       )}
 
+      {user && (
       <div className="user-area" style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', paddingLeft: 12, borderLeft: '1px solid var(--border)' }}>
         <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
           {user.username}{user.role === 'admin' ? ' 🔧' : ''}
@@ -114,6 +115,7 @@ export const TopBar: React.FC<Props> = ({
           退出
         </button>
       </div>
+      )}
 
       {showAdmin && <AdminPanel onClose={() => setShowAdmin(false)} />}
     </div>

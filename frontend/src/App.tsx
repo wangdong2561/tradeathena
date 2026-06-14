@@ -4,10 +4,15 @@ import { TradingPage } from './components/TradingPage'
 import type { User } from './types'
 
 export const App: React.FC = () => {
+  // Clean up legacy keys from previous versions
+  localStorage.removeItem('ta_login')
+
   const [user, setUser] = useState<User | null>(() => {
     try {
       const stored = localStorage.getItem('ta_user')
-      return stored ? JSON.parse(stored) : null
+      if (!stored) return null
+      const parsed = JSON.parse(stored)
+      return parsed && parsed.username ? parsed : null
     } catch { return null }
   })
 
