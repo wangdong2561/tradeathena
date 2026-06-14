@@ -257,7 +257,7 @@ tradeathena/
 
 ## ☕ Sponsor
 
-If this project helps you, consider buying the author a coffee ☕
+If this project helps you, consider buying the author a cup of milk tea(¥8-10) ☕
 
 ![WeChat Pay (微信支付) — Scan this QR code with the WeChat app to send a tip](pay.jpg)
 
