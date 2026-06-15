@@ -61,7 +61,7 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
   const crossLineRefs = useRef<any[]>([])
   const bidLineRef = useRef<any>(null)
   const askLineRef = useRef<any>(null)
-  // No timezone conversion — data source uses UTC, chart displays UTC
+  // Chart timestamps in epoch ms; lightweight-charts converts to local time (Beijing)
 
   // Safe setData wrapper — catches errors, no crash
   const sd = useCallback((series: any, data: any[]) => {
@@ -127,6 +127,17 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
         timeScale: {
           borderColor: '#2a2e38',
           timeVisible: true,
+          tickMarkFormatter: (time: any) => {
+            // time is UTCTimestamp (epoch seconds). Display as Beijing (+8h)
+            const d = new Date((typeof time === 'number' ? time : Number(time)) * 1000 + 28800000)
+            const hh = String(d.getUTCHours()).padStart(2, '0')
+            const mi = String(d.getUTCMinutes()).padStart(2, '0')
+            const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+            const dd = String(d.getUTCDate()).padStart(2, '0')
+            // Show date if minute=0 (new candle), otherwise show HH:MM
+            if (mi === '00') return `${mm}-${dd}\n${hh}:${mi}`
+            return `${hh}:${mi}`
+          },
         },
         rightPriceScale: {
           borderColor: '#2a2e38',
@@ -259,6 +270,28 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
     } else {
       setActiveTool(tool)
     }
+  }, [])
+
+  const handleZoomIn = useCallback(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    const range = chart.timeScale().getVisibleLogicalRange()
+    if (!range) return
+    const from = range.from, to = range.to
+    const mid = (from + to) / 2
+    const newHalf = (to - from) * 0.3  // zoom in: show 30% fewer bars
+    chart.timeScale().setVisibleLogicalRange({ from: mid - newHalf, to: mid + newHalf })
+  }, [])
+
+  const handleZoomOut = useCallback(() => {
+    const chart = chartRef.current
+    if (!chart) return
+    const range = chart.timeScale().getVisibleLogicalRange()
+    if (!range) return
+    const from = range.from, to = range.to
+    const mid = (from + to) / 2
+    const newHalf = (to - from) * 0.7  // zoom out: show 70% more bars
+    chart.timeScale().setVisibleLogicalRange({ from: mid - newHalf, to: mid + newHalf })
   }, [])
 
   const clearLines = useCallback(() => {
@@ -528,8 +561,10 @@ export const TradingChart: React.FC<Props> = ({ data, symbol, tradeMarkers = [],
           水平线✎
         </button>
         <span className="separator" />
-        <button onClick={() => { chartRef.current?.timeScale().scrollToPosition(-5, false) }}>◁</button>
-        <button onClick={() => { chartRef.current?.timeScale().scrollToPosition(0, false) }}>▷</button>
+        <button onClick={handleZoomIn} title="放大">🔍+</button>
+        <button onClick={handleZoomOut} title="缩小">🔍−</button>
+        <button onClick={() => { chartRef.current?.timeScale().scrollToPosition(-5, false) }} title="左移">◁</button>
+        <button onClick={() => { chartRef.current?.timeScale().scrollToPosition(0, false) }} title="右移">▷</button>
         <span className="separator" />
         <button onClick={() => handleToolClick('auto')}>自适应</button>
         <span className="separator" />

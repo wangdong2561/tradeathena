@@ -26,7 +26,7 @@ export const PositionsTable: React.FC<Props> = ({ positions, onClose }) => {
 
   const fmtTime = (ts?: number) => {
     if (!ts) return '-'
-    return new Date(ts * 1000).toISOString().replace('T', ' ').slice(0, 19) + ' UTC'
+    return new Date(ts * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
   }
 
   return (

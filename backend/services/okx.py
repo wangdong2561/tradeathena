@@ -45,7 +45,8 @@ def _from_okx(s: str) -> str:
 
 _INTERVAL_MAP = {
     "1m": "1m", "3m": "3m", "5m": "5m", "15m": "15m", "30m": "30m",
-    "1h": "1H", "2h": "2H", "4h": "4H", "6h": "6H", "12h": "12H", "1d": "1D", "1w": "1W",
+    "1h": "1H", "2h": "2H", "4h": "4H", "6h": "6H", "12h": "12H",
+    "1d": "1D", "1w": "1W", "1M": "1M",
 }
 
 
@@ -209,13 +210,15 @@ class OkxClient:
                         if ch == "tickers" and data:
                             d = data[0]
                             last = float(d.get("last", 0))
+                            op24 = float(d.get("open24h", last))
+                            change_pct = round((last - op24) / op24 * 100, 2) if op24 > 0 else 0
                             self.prices[sym] = last
                             self.bids[sym] = float(d.get("bidPx", 0))
                             self.asks[sym] = float(d.get("askPx", 0))
                             ticker_msg = {
                                 "s": sym, "c": d.get("last", "0"),
                                 "b": d.get("bidPx", "0"), "a": d.get("askPx", "0"),
-                                "P": "0", "v": d.get("vol24h", "0"),
+                                "P": str(change_pct), "v": d.get("vol24h", "0"),
                                 "h": d.get("high24h", "0"), "l": d.get("low24h", "0"),
                             }
                             for cb in self._callbacks.get(f"{sym.lower()}@ticker", []):

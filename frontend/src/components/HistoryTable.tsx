@@ -43,8 +43,8 @@ export const HistoryTable: React.FC = () => {
             <td className={t.profit >= 0 ? 'positive' : 'negative'}>
               {t.profit >= 0 ? '+' : ''}${t.profit.toFixed(2)}
             </td>
-            <td className="text-muted">{new Date(t.open_time).toLocaleString()}</td>
-            <td className="text-muted">{new Date(t.close_time).toLocaleString()}</td>
+            <td className="text-muted">{new Date(t.open_time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}</td>
+            <td className="text-muted">{new Date(t.close_time).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })}</td>
           </tr>
         ))}
       </tbody>

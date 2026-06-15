@@ -50,9 +50,18 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
   const [timeframe2, setTimeframe2] = useState('1h') // right - trend direction
 
   // Auto-calculate: when right chart changes, sync left accordingly
+  const TF_LABELS: Record<string, string> = {
+    'line': '分时',
+    '1m': '1分', '3m': '3分', '5m': '5分', '15m': '15分', '30m': '30分',
+    '1h': '1时', '2h': '2时', '4h': '4时', '6h': '6时', '12h': '12时',
+    '1d': '1日', '1w': '1周', '1M': '1月',
+  }
+  const ALL_TFS = ['line','1m','3m','5m','15m','30m','1h','2h','4h','6h','12h','1d','1w','1M']
+  const OKX_TFS = ['line','1m','3m','5m','15m','30m','1h','2h','4h','6h','12h','1d','1w','1M']
   const tfMap: Record<string, string> = {
-    '1m': '1m', '3m': '1m', '5m': '1m', '15m': '1m', '30m': '1m',
-    '1h': '1m', '2h': '1m', '4h': '1m', '6h': '1m', '12h': '1m', '1d': '1m',
+    'line': '1m', '1m': '1m', '3m': '1m', '5m': '1m', '15m': '1m', '30m': '1m',
+    '1h': '1m', '2h': '1m', '4h': '1m', '6h': '1m', '12h': '1m',
+    '1d': '1m', '1w': '1m', '1M': '1m',
   }
   const updateTimeframe2 = useCallback((tf: string) => {
     setTimeframe2(tf)
@@ -122,7 +131,8 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
   }, [setKlineDataSortedSorted])
 
   const loadKlines2 = useCallback(() => {
-    fetchKlines(selectedRef2.current, timeframeRef2.current, 200)
+    const tf = timeframeRef2.current === 'line' ? '1m' : timeframeRef2.current
+    fetchKlines(selectedRef2.current, tf, 200)
       .then(setKlineData2)
       .catch(() => {})
   }, [])
@@ -135,7 +145,8 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
 
   useEffect(() => {
     loadKlines2()
-    subscribeKline(selectedSymbol, timeframe2).catch(() => {})
+    const tf = timeframe2 === 'line' ? '1m' : timeframe2
+    subscribeKline(selectedSymbol, tf).catch(() => {})
   }, [selectedSymbol, timeframe2, loadKlines2])
 
   // ── News ────────────────────────────────────────────────
@@ -212,7 +223,9 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
       if (interval === timeframeRef.current) {
         setKlineDataSorted(prev => updateKlineArr(prev, kline))
       }
-      if (interval === timeframeRef2.current) {
+      // "分时" mode uses 1m data
+      const tf2 = timeframeRef2.current === 'line' ? '1m' : timeframeRef2.current
+      if (interval === tf2) {
         setKlineData2(prev => updateKlineArr(prev, kline))
       }
     })
@@ -320,11 +333,11 @@ export const TradingPage: React.FC<Props> = ({ user, onLogout }) => {
               <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                 <div style={{ height: 30, display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500 }}>{selectedSymbol.replace('USDT', '/USDT').replace('XAUUSD', 'XAU/USD').replace('XAGUSD', 'XAG/USD')}</span>
-                  <div style={{ display: 'flex', gap: 2 }}>
-                    {['1m','5m','15m','1h','4h','1d'].map(t => (
+                  <div style={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {OKX_TFS.map(t => (
                       <button key={t} onClick={() => updateTimeframe2(t)}
-                        style={{ background: 'transparent', border: 'none', color: timeframe2 === t ? 'var(--accent)' : 'var(--text-secondary)', padding: '1px 5px', fontSize: 10, cursor: 'pointer', borderRadius: 2 }}>
-                        {t}
+                        style={{ background: 'transparent', border: 'none', color: timeframe2 === t ? 'var(--accent)' : 'var(--text-secondary)', padding: '1px 3px', fontSize: 10, cursor: 'pointer', borderRadius: 2 }}>
+                        {TF_LABELS[t]}
                       </button>
                     ))}
                   </div>

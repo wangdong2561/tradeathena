@@ -52,7 +52,7 @@ async function put<T>(path: string, body: unknown, auth = false): Promise<T> {
 
 export async function fetchKlines(symbol: string, interval: string, limit = 500): Promise<Kline[]> {
   const data = await get<{ data: number[][] }>(`/market/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`)
-  // Binance kline format: [time, open, high, low, close, volume, ...]
+  // OKX kline format: [time_ms, open, high, low, close, volume, ...]
   return data.data.map(k => ({
     time: Math.floor(k[0] / 1000) as any,
     open: parseFloat(String(k[1])),

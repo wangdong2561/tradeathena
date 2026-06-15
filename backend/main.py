@@ -299,11 +299,12 @@ async def ws_orders(ws: WebSocket):
 
 
 # ── Serve frontend (production) ────────────────────────
-
-import os
-_frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
-if os.path.isdir(_frontend_dir):
-    app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")
+# 开发时使用 http://localhost:5173/ (Vite dev server, 热更新)
+# 生产构建: cd frontend && npm run build （取消注释下行）
+# import os
+# _frontend_dir = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
+# if os.path.isdir(_frontend_dir):
+#     app.mount("/", StaticFiles(directory=_frontend_dir, html=True), name="frontend")
 
 
 if __name__ == "__main__":

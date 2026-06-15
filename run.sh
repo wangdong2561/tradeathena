@@ -13,7 +13,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # ── Kill existing processes on target ports ────────────
-for port in 8000 5173; do
+for port in 8000 8001 5173; do
   pid=$(lsof -ti tcp:$port 2>/dev/null)
   if [ -n "$pid" ]; then
     echo "🔧 清理端口 $port (PID $pid)..."
