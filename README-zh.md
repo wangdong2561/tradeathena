@@ -42,6 +42,30 @@
 
 ---
 
+## 获取 OKX API Key
+
+本平台使用 OKX 作为实时行情数据源。需要免费注册 OKX 账号并创建 API Key。
+
+### 申请步骤
+
+1. 注册 OKX 账号：<https://www.okx.com/>（支持邮箱/手机注册）
+2. 登录后进入 **账户 → API**（或访问 <https://www.okx.com/account/my-api>）
+3. 点击 **"新建 API Key"**
+4. 选择 **"交易"类型**（即使只做模拟交易也选此类型，公共行情数据也需要 Key）
+5. 设置 **通行口令(Passphrase)** — 创建 API 时设置，**务必记住**
+6. 权限勾选 **"读取"** 即可（本平台仅需行情数据，不需交易权限）
+7. 创建成功后得到三个关键信息：
+
+| 字段 | 说明 | 是否必填 |
+|:---|:---|:---|
+| **API Key** | 长字符串，如 `68ded352-...` | ✅ 必填 |
+| **Secret Key** | 创建时只显示一次，**立即复制保存** | 行情数据可不填 |
+| **Passphrase** | 你设置的通关口令 | 行情数据可不填 |
+
+> 💡 只查看实时行情的话，只需填写 `OKX_API_KEY`，其余两个可留空。
+
+---
+
 ## 首次安装
 
 ```bash
@@ -74,7 +98,7 @@ cd frontend && npm install && cd ..
 
 ```bash
 cd ~/tradeathena
-bash run.sh
+OKX_API_KEY="your okx api key" bash run.sh
 ```
 
 ### 方式二：分别启动
@@ -85,7 +109,7 @@ bash run.sh
 cd ~/tradeathena
 source .venv/bin/activate
 export PATH="$HOME/.cargo/bin:$PATH"
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+OKX_API_KEY="your okx api key" uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 **终端 2 — 前端 (端口 5173):**

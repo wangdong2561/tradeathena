@@ -42,6 +42,30 @@ Core Engine (Rust)                 ← High-Performance Computing Layer
 
 ---
 
+## Getting an OKX API Key
+
+This platform uses OKX as its real-time market data source. You need a free OKX account and API Key.
+
+### Steps
+
+1. Register at OKX: <https://www.okx.com/>
+2. Go to **Account → API** (<https://www.okx.com/account/my-api>)
+3. Click **"Create API Key"**
+4. Select **"Trading" type** (required even for demo — public data also needs this type)
+5. Set a **Passphrase** — this is one of the three key credentials, **save it**
+6. Permission: check only **"Read"** (this platform only needs market data, no trading permissions)
+7. After creation, you get three items:
+
+| Field | Description | Required |
+|:---|:---|:---|
+| **API Key** | Long string, e.g. `68ded352-...` | ✅ Yes |
+| **Secret Key** | Only shown once at creation, **copy it immediately** | Optional for quotes |
+| **Passphrase** | The passphrase you set | Optional for quotes |
+
+> 💡 For viewing real-time quotes only, just fill in `OKX_API_KEY` — the other two can be left empty.
+
+---
+
 ## Installation
 
 ```bash
@@ -74,7 +98,7 @@ cd frontend && npm install && cd ..
 
 ```bash
 cd ~/tradeathena
-bash run.sh
+OKX_API_KEY="your okx api key" bash run.sh
 ```
 
 ### Separate terminals
@@ -85,7 +109,7 @@ bash run.sh
 cd ~/tradeathena
 source .venv/bin/activate
 export PATH="$HOME/.cargo/bin:$PATH"
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
+OKX_API_KEY="your okx api key" uvicorn backend.main:app --host 0.0.0.0 --port 8000
 ```
 
 **Terminal 2 — Frontend (port 5173):**
